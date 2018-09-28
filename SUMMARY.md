@@ -1,6 +1,8 @@
 # 比特币源码情景分析
 
-* [前言](README.md)
+* [简介](README.md)
+    * [序](introduction.md)
+
 
 * [从零编译比特币](build.md)
 
