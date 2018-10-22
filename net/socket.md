@@ -4,9 +4,8 @@ P2P 网络的建立是在系统启动的第 12 步，最后时刻调用 `CConnma
 
 本部分内容在 `net.cpp`、`net_processing.cpp` 等文件中。
 
-下面开始讲解各个线程的具体处理。
 
-## 1、ThreadSocketHandler
+## ThreadSocketHandler
 
 这个线程主要用来处理套接字的读取和发送，调用系统提供的相关相关底层函数进行处理，把收到的消息转化成 `CNetMessage` 类型的对象，并保存到节点的 `vRecvMsg` 集合中，把待发送的消息从 `vSendMsg` 集合中取出来进行发送。
 
