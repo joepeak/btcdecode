@@ -38,13 +38,15 @@
 
 当 Homebrew 安装完成之后，就开始安装编译比特币的各种依赖了，命令如下：
 
-    brew install automake berkeley-db4 libtool boost miniupnpc openssl pkg-config protobuf python qt libevent qrencode
+    brew install automake berkeley-db4 libtool boost miniupnpc openssl pkg-config protobuf python qt libevent qrencode 
 
 如果你需要生成 `dmg` 可执行文件，那么还需要 RSVG，安装命令如下：
 
     brew install librsvg
 
+如果需要 ZMQ，那么还需要相关的库，安装命令如下：
 
+    brew install zmq
 
 ## 具体步骤
 
@@ -60,6 +62,18 @@
         ./configure --enable-debug
         make clean && make -j4
 
+    如果在编译过程中，出现如下错误：
+
+        ld: symbol(s) not found for architecture x86_64
+        clang: error: linker command failed with exit code 1 (use -v to see invocation)
+        make[2]: *** [bitcoind] Error 1
+        make[1]: *** [all-recursive] Error 1
+        make: *** [all-recursive] Error 1
+
+    那么需要明确指定 Boost 位置：
+
+        ./configure --enable-debug --with-boost=/usr/local/opt/boost
+        
     如果你不需要图形界面，那么在执行 `./configure` 时需要加入 `--without-gui` 标志，即 `./configure --without-gui`。另外，在 Mac 系统下，为了调试比特币代码，需要把 `configure` 文件中的所有 `-g -O2` 替换为 `-g`，这是因为 Mac 下的 LLDB 存在 bug，导致某些变量不可用。
 
     当你看到下面的图片时，恭喜你编译成功了。
