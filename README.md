@@ -5,7 +5,7 @@
 
 ### 快速阅读传送门
 - Github快速阅读任一章节：[进入目录](https://github.com/joepeak/bitcoindecode/blob/master/SUMMARY.md)
-- Gitbook完整顺序地阅读：[进入Gitbook](https://joepeak.gitbooks.io/bitcoindecode/content/)
+- Gitbook完整顺序地阅读：[进入Gitbook](https://joepeak.gitbook.io/btcdecode/)
 
 
 # 前言
