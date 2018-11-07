@@ -1,3 +1,7 @@
+#   P2P 网络建立之消息处理下篇
+
+终于来到了最重点的部分咯~接续上篇和中篇，我们这次来讲解下载区块，区块头，以及交易。有什么用呢？下载完之后，比特币的所有的区块交易在本地就有了副本了，成为完整的比特币节点，完全跟比特币网络同步咯。随后，你想挖矿，建立区块浏览器都不是难事儿啦。
+
 ##  10、IBD 时，区块头部优先节点获取数据的处理
 
 `IBD` 即初始区块下载的缩写。
@@ -224,7 +228,7 @@
                     state->hashLastUnknownBlock = hash;
                 }
             }
-    
+
     -   如果收到的区块头部数量达到规定的最大值 2000 （`MAX_HEADERS_RESULTS`），意味着对等节点还有更多的头部可以发送，那么调用 `PushMessage` 方法，发送 `getheaders` 消息，请求更多的区块头部。
 
     -   调用 `CanDirectFetch` 方法，检测是否可以直接获取区块数据。
@@ -699,7 +703,7 @@
                         }
                     }
                 }
-    
+
     -   如果 `pindex` 为空，则调用 `AddToBlockIndex` 方法，生成一个新的区块索引对象并进行初始化，然后添加到 `mapBlockIndex` 集合中。
 
     -   接下来，调用 `CheckBlockIndex` 方法，检查所有的区块索引对象。
@@ -1321,7 +1325,7 @@
         if (locator.vHave.size() > MAX_LOCATOR_SZ) {
             pfrom->fDisconnect = true;
             return true;
-        } 
+        }
 
 3.  调用 `ActivateBestChain` 方法，激活最佳的区块链。
 
@@ -1533,4 +1537,3 @@
 
         pfrom->fSendMempool = true;
         return true;
-
