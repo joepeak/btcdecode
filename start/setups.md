@@ -884,7 +884,7 @@
 
     -   sendmany
 
-    -   sendtoaddress，发送一定的币到指定的地址。
+    -   **sendtoaddress，发送一定的币到指定的地址，即进行交易**。
 
     -   settxfee，设置每 kb 交易费用。
 
