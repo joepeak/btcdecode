@@ -26,8 +26,12 @@
 
 -   pindexBestHeaderSent
 
+    发送给对等节点的最佳区块索引。
+
 -   nUnconnectingHeaders
 
+    未连接到区块链上的头部数量。
+    
 -   fSyncStarted
 
 -   nStallingSince 

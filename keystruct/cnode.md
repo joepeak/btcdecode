@@ -46,6 +46,7 @@
 
 -	vRecvGetData
 
+	接收到的请求数据队列，接收 `getdata` 消息时，设置的。
 -	nRecvBytes
 
 -	nRecvVersion
@@ -215,3 +216,14 @@
 -	addrLocal
 
 	对等节点的地址，接收 `version` 消息时，设置的。
+
+-	hashContinue
+
+-	nLastTXTime
+
+	最后一次收到交易的时间
+
+-	nLastBlockTime
+
+	最后一次收到区块的时间
+
