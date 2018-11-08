@@ -534,11 +534,16 @@
 
     -   createwallet
 
-        **创建并加载一个新钱包**。
+        **创建并加载一个新钱包**。 系统会自动创建一个默认的钱包，名字为空。
 
-        系统会创建一个默认的钱包，名字为空。可以用 `listwallets` 显示所有加载的钱包。可以用 `importprivkey` 命令添加一个私钥到钱包。
+            ./src/bitcoin-cli -regtest  createwallet test
 
-        当有多个钱包时，为了操作某个特定钱包，需要使用 `-rpcwallet=钱包名字`，比如：显示默认钱包的命令为：`./src/bitcoin-cli -regtest  -rpcwallet= getwalletinfo`。
+       可以用 `listwallets` 显示所有加载的钱包，可以用 `importprivkey` 命令添加一个私钥到钱包。
+
+        当有多个钱包时，为了操作某个特定钱包，需要使用 `-rpcwallet=钱包名字`，比如：
+
+            ./src/bitcoin-cli -regtest -rpcwallet= getwalletinfo
+            ./src/bitcoin-cli -regtest -rpcwallet=test getwalletinfo
 
     -   dumpprivkey
 
@@ -564,6 +569,10 @@
 
         **返回一个新的比特币地址**。
 
+            ./src/bitcoin-cli -regtest -rpcwallet=test getnewaddress
+
+        `-rpcwallet` 参数一定要放在 RPC 命令之前。
+        
         生成地址的过程会先生成私钥，可以通过 `dumpprivkey` 命令来显示与之相关的私钥，可以通过 `setlabel` 命令设置与给定地址相关的标签。
 
     -   getrawchangeaddress
