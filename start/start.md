@@ -32,10 +32,7 @@ main 函数本身没有太多东西，主要是调用3个函数来执行，它�
     int main(int argc, char* argv[])
     {
         SetupEnvironment();
-
-        // Connect bitcoind signal handlers
         noui_connect();
-
         return (AppInit(argc, argv) ? EXIT_SUCCESS : EXIT_FAILURE);
     }
 
@@ -52,209 +49,43 @@ main 函数本身没有太多东西，主要是调用3个函数来执行，它�
 
 1.  调用 `SetupServerArgs` 函数，设置系统可接受的所有命令行参数。然后开始解析命令行传递的各种参数。
 
-    系统执行的重要一步就是就设置可以接收的参数并解析用户启动时传递的各种参数，`SetupServerArgs` 函数就是完成这个目的。下面来看这个函数的执行流程。
+    系统执行的重要一步就是就设置可以接收的参数，解析用户启动时传递的各种参数，`SetupServerArgs` 函数就是完成这个目的。下面来看这个函数的执行流程。
 
-    -   首先，调用 `CreateBaseChainParams` 函数，生成默认的基本参数，包括：使用的数据目录和监听的端口。根据不同的网络类型，主网络使用 8332 端口和指定目录下的当前目录，测试网络使用 18332 端口和指定目录下的 testnet3 子目录，回归测试网络使用 18443 端口和指定目录下的 regtest 子目录。
+    - 首先，调用 `CreateBaseChainParams` 函数，生成默认的基本参数，包括：使用的数据目录和监听的端口。根据不同的网络类型，主网络使用 8332 端口和指定目录下的当前目录，测试网络使用 18332 端口和指定目录下的 testnet3 子目录，回归测试网络使用 18443 端口和指定目录下的 regtest 子目录。
 
-    -   然后，调用 `CreateChainParams` 函数，生成默认的区块链参数。这个方法也会区分不同的网络。
+          const auto defaultBaseParams = CreateBaseChainParams(CBaseChainParams::MAIN);
+          const auto testnetBaseParams = CreateBaseChainParams(CBaseChainParams::TESTNET);
+          const auto regtestBaseParams = CreateBaseChainParams(CBaseChainParams::REGTEST);
 
-        如果是主网络，则生成 `CMainParams` 对象进行初始化。在构造函数中，进行如下的设置：
+    - 然后，调用 `CreateChainParams` 函数，生成默认的区块链参数。这个方法也会区分不同的网络。
 
-        -   设置网络ID 为 `main`；
-
-        -   设置共识参数（`Consensus::Params`）的各个值：
-
-            -   每隔多少个块（`nSubsidyHalvingInterval`）后续比特币的奖励会减半，值为 210000。根据创世区块奖励的数量（50），根据等比数列求和公式：$$ 50 * (1 / (1 - 0.5)) * 210000 $$，可计算货币总量为 2100W个比特币。
-
-            -   BIP34 激活高度（`BIP34Height`）为 227931。
-
-            -   BIP34 激活哈希（`BIP34Hash`）为 `0x000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8`。
-
-            -   BIP65 激活高度（`BIP65Height`）为 388381。
-
-            -   BIP66 激活高度（`BIP66Height`）为 363725。
-
-            -   工作量限制（`powLimit`）为一个大整数。
-
-            -   难度改变的周期（`nPowTargetTimespan`）为 2周。
-
-            -   平均出块时间（`nPowTargetSpacing`）为10分钟。
-
-            -   改变共识需要的区块数（`nRuleChangeActivationThreshold`）为 1916，即 2016 的 95%。
-
-            -   矿工确认窗口（`nMinerConfirmationWindow`）为 2016，等于难度改变周期除以平均出块时间。
-
-            -   接下来设置区块链相关的部署状态，包括：测试相关的（`DEPLOYMENT_TESTDUMMY`）、CSV 软分叉相关的（涉及到 BIP68、BIP112、BIP113）和隔离见证相关的（涉及到 BIP141、BIP143、BIP147）。
-
-            -   最佳区块链的最小工作量。
-
-            -   设置默认端口（`nDefaultPort`）为 8333。
-
-            -   达到多少个区块之后进行区块修剪（`nPruneAfterHeight`），当前值为 100000。
-
-            -   接下来，调用 `CreateGenesisBlock` 方法，生成创世区块。这个方法的参数是固定的，指定了创世区块的时间、随机数、难度值、版本号、奖励等。在方法内部，生成创世区块的输出脚本和输入脚本，中本聪那句著名的评论就出现在创世区块的第一个交易的签名中，他写道：The Times 03/Jan/2009 Chancellor on brink of second bailout for banks。
-
-            -   设置创世区块的哈希为刚生成的创业区块的哈希。
-
-            -   设置 DNS 种子节点 `vSeeds` 集合包含的 DNS 种子有：`seed.bitcoin.sipa.be`，`dnsseed.bluematt.me`，`dnsseed.bitcoin.dashjr.org`，`seed.bitcoinstats.com`，`seed.bitcoin.jonasschnelli.ch`，`seed.btc.petertodd.org`，`seed.bitcoin.sprovoost.nl` 等，通过解析 DNS 种子节点，比特币节点启动时可以找到更多的对等节点来进行连接。
-
-            -   接下来，设置相关的检查点数据。
-
-        如果是测试网络，则生成 `CTestNetParams` 对象进行初始化。如果是回归测试网络，则生成 `CRegTestParams` 对象进行初始化。对于两种测试网络，处理基本和主网络相同，只是某些参数不一样。
+          const auto defaultChainParams = CreateChainParams(CBaseChainParams::MAIN);
+          const auto testnetChainParams = CreateChainParams(CBaseChainParams::TESTNET);
+          const auto regtestChainParams = CreateChainParams(CBaseChainParams::REGTEST);
 
         上面3个对象的定义都在 `chainparams.cpp` 文件中。
 
-    -   接下来，设置系统可接收的所有参数。
+    - 接下来，设置一些隐藏的参数。
 
-        部分参数解释如下：
+          std::vector<std::string> hidden_args = {"-h", "-help",
+              "-dbcrashratio", "-forcecompactdb",
+              "-allowselfsignedrootcertificates", "-choosedatadir", "-lang=<lang>", "-min", "-resetguisettings", "-rootcertificates=<file>", "-splash", "-uiplatform"};
 
-        -   ?，显示帮助信息；
+    - 再接下来，设置系统可接收的所有参数。
 
-        -   -version，打印版本信息，并退出系统。
+      除了 `SetupServerArgs` 方法中直接列出的这些之外，还通过下面三种方法设置了一些参数：
 
-        -   -assumevalid=hex，如果指定的区块存在区块链中，假定它及其祖先有效并可能跳过其脚本验证。
+      - 通过钱包接口（`wallet/init.cpp`）的 `AddWalletOptions` 方法，设置了一些钱包相关的参数；
 
-        -   -blocksdir=dir，指定区块链存放的目录。
+      - 通过调用 `SetupChainParamsBaseOptions` 方法，设置了区块链相关的参数；
 
-        -   -blocknotify=cmd，指定当主链上的区块改变时执行的命令。
+      - 通过调用 `AddHiddenArgs` 方法，设置了一些隐藏参数。
 
-        -   -conf=file，指定配置文件的目录，相对于下面指定的数据目录。
+      上面是一些常用的参数，通过这些参数可以影响比特币核心的命令。
 
-        -   -datadir=dir，指定数据目录。
+      应用开发者比较关注的是 RPC 相关的设置，通过 RPC 接口，我们调用比特币核心提供的多种服务。这些命令通常会在配置文件中进行设置，不用在命令行指定。
 
-        -   -dbcache=n，设置数据库缓存大小。
-
-        -   -debuglogfile=file，设置调试文件的位置。
-
-        -   -feefilter，告诉其他节点通过最小交易费用过滤发送给我们的库存消息。
-
-        -   -loadblock=file，在启动时，从外部 blk000??.dat 文件导入区块。
-
-        -   -maxmempool=n，指定交易池的最大内存数，单位为兆字节。
-
-        -   -maxorphantx=n，指定内存中最大的孤儿交易数量。
-
-        -   -mempoolexpiry=n，指定交易池中不跟踪超过指定时间（小时）的交易。
-
-        -   -par=n，指定脚本签名的线程数量。
-
-        -   -persistmempool，指定是否持久化交易池中的交易，启动时恢复加载。
-
-        -   -pid=file，指定进程文件。
-
-        -   -prune=n，通过启用旧区块的修剪（删除）来降低存储要求。 这允许调用 `pruneblockchain` RPC 来删除特定块，并且如果提供目标大小，则启用对旧块的自动修剪。 此模式与 `-txindex` 和 `-rescan` 不兼容。
-
-        -   -reindex，根据硬盘上的 `blk*.dat` 文件重建区块链状态和区块的索引。
-
-        -   -reindex-chainstate，根据当前区块的索引重建区块链的状态。
-
-        -   -txindex，维护所有交易的索引，被 `getrawtransaction` RPC 命令调用。
-
-        -   -addnode=ip，添加一个节点，并连接它，并保持连接。
-
-        -   -banscore=n，断开行为不端的同伴的门槛。
-
-        -   -bantime=n，不诚实节点重新连接需要的秒数。
-
-        -   -bind=addr，绑定到指定的IP，并始终监听它。
-
-        -   -connect=ip，仅仅只连接到指定的节点，如果不是ip而是0，则表示禁止自动连接。
-
-        -   -discover，是否发现自己的IP地址。
-
-        -   -dns，对于 `-addnode`、`-seednode`、`-connect` 总是使用 DNS 查找。
-
-        -   -dnsseed，指定如果已有地址比较少，则进行 DNS 查找来获取对等节点。
-
-        -   -enablebip61，允许发送 BIP61 定义的拒绝消息。
-
-        -   -externalip=ip，指定自身的外部 IP 地址。
-
-        -   -forcednsseed，总是通过 DNS 查找来获取对等节点的地址。
-
-        -   -listen，接收外部对等节点的连接。
-
-        -   -listenonion，自动创建 Tor 隐藏服务。
-
-        -   -maxconnections=n，维护到别的节点的最大连接数。
-
-        -   -maxreceivebuffer=n，每个对等节点的最大接收缓存。
-
-        -   -maxsendbuffer=n，每个对等节点的最大发送缓存。
-
-        -   -onion=ip:port，设置 SOCKS5 代理。
-
-        -   -peerbloomfilters，支持布隆过滤器过滤区块和交易。
-
-        -   -permitbaremultisig，中继非 P2SH 多重签名。
-
-        -   -port=port，指定默认的监听端口。
-
-        -   -proxy=ip:port，通过 SOCKS5 代理进行连接。
-
-        -   -proxyrandomize，随机化每个代理连接的凭据。 从而使Tor流进行隔离。
-
-        -   -seednode=ip，指定一个节点来检索其他的节点，随后就从这个接点进行断开。
-
-        -   -torcontrol=ip:port，在 onion 启用的情况下，指定 Tor 控制器使用的端口。
-
-        -   -torpassword=pass，Tor 控制器的密码。
-
-        -   -whitebind=addr，本节点绑定到这个地址上，白名单中的节点通过这个地址连接到节点。
-
-        -   -whitelist=IP address or network，当收到连接请求的时候，如果节点在这个白名单中，就直接中继而不用检查。
-
-        -   -checkblocks=n，在启动时要检查多少个区块。
-
-        -   -checklevel=n，`checkblocks` 验证区块的程度。
-
-        -   -checkblockindex，进行完整的一致性检查，包括：mapBlockIndex、setBlockIndexCandidates、chainActive、mapBlocksUnlinked 等。
-
-        -   -checkmempool=n，每多少个交易进行检验。
-
-        -   -checkpoints，提供检查点，对已知链的历史不进行检验。
-
-        -   -deprecatedrpc=method，不赞成使用的 RPC 方法。
-
-        -   -limitancestorcount=n，如果交易池中的祖先交易达到或超过指定的值时，不再接收交易。
-
-        -   -limitancestorsize=n，如果交易池中的祖先交易大小达到或超过指定的值时，不再接收交易。
-
-        -   -limitdescendantcount=n，如果交易池中祖先交易的后代已经达到或超过指定的值时，不再接收交易。
-
-        -   -blockmaxweight=n，设置 BIP141 区块的最大 weight。
-
-        -   -blockmintxfee=amt，设置包含在创建区块的交易最小费用。
-
-        -   -blockversion=n，重写区块版本号，以测试分叉方案。
-
-        -   -rest，允许 REST 请求。
-
-        -   -rpcallowip=ip，设置允许 JSON-RPC 连接的地址/来源。
-
-        -   -rpcauth=userpw，JSON-RPC 连接的用户名和密码哈希。
-
-        -   -rpcbind=addr:port，绑定到指定的地址来监听 JSON-RPC 连接。
-
-        -   -rpccookiefile=loc，进行验证的的 cookie 位置。
-
-        -   -rpcuser=user，JSON-RPC 连接的用户名。
-
-        -   -rpcpassword=pw，JSON-RPC 连接的用户密码。
-
-        -   -rpcport=port，JSON-RPC连接监听的端口。
-
-        -   -rpcservertimeout=n，HTTP 请求的超时时间。
-
-        -   -rpcthreads=n，设置服务 RPC 调用的线程数量。
-
-        -   -rpcworkqueue=n，设置服务 RPC 调用的工作队列深度。
-
-        -   -server，接受命令行和 JSON-RPC 命令。
-
-        -   -debug=category，输入调试信息。如果输出类别（category）不指定默认输出所有调试信息。类别包括：addrman、alert、bench、cmpctblock、coindb、db、http、libevent、lock、mempool、mempoolrej、net、proxy、prune、rand、reindex、rpc、selectcoins、tor、zmq、qt 等。
-
-    上面是一些常用的参数，通过这些参数可以影响比特币核心的命令。应用开发者比较关注的是 RPC 相关的设置，通过 RPC 接口，我们调用比特币核心提供的多种服务。这些命令通常会在配置文件中进行设置，不用在命令行指定。
+      **具体有哪些参数，可以参考本文的第三部分：系统可接受的参数**
 
 2.  接下来，检查用户指定命令参数是否正确。
 
@@ -355,4 +186,264 @@ main 函数本身没有太多东西，主要是调用3个函数来执行，它�
 14. 如果应用初始化主函数出错，则调用 `Interrupt` 函数进行中止，否则调用 `WaitForShutdown` 函数等待系统结束。
 
     `WaitForShutdown` 函数是一个无限循环函数。
+
+
+##  3、系统可接受的参数
+
+### 常用参数
+
+- ?，显示帮助信息；
+
+- -version，打印版本信息，并退出系统。
+
+-   -assumevalid=hex，如果指定的区块存在区块链中，假定它及其祖先有效并可能跳过其脚本验证。
+
+-   -blocksdir=dir，指定区块链存放的目录。
+
+-   -blocknotify=cmd，指定当主链上的区块改变时执行的命令。
+
+-   -conf=file，指定配置文件的目录，相对于下面指定的数据目录。
+
+-   -datadir=dir，指定数据目录。
+
+-   -dbcache=n，设置数据库缓存大小。
+
+-   -debuglogfile=file，设置调试文件的位置。
+
+-   -feefilter，告诉其他节点通过最小交易费用过滤发送给我们的库存消息。
+
+-   -loadblock=file，在启动时，从外部 blk000??.dat 文件导入区块。
+
+-   -maxmempool=n，指定交易池的最大内存数，单位为兆字节。
+
+-   -maxorphantx=n，指定内存中最大的孤儿交易数量。
+
+-   -mempoolexpiry=n，指定交易池中不跟踪超过指定时间（小时）的交易。
+
+-   -par=n，指定脚本签名的线程数量。
+
+-   -persistmempool，指定是否持久化交易池中的交易，启动时恢复加载。
+
+-   -pid=file，指定进程文件。
+
+-   -prune=n，通过启用旧区块的修剪（删除）来降低存储要求。 这允许调用 `pruneblockchain` RPC 来删除特定块，并且如果提供目标大小，则启用对旧块的自动修剪。 此模式与 `-txindex` 和 `-rescan` 不兼容。
+
+-   -reindex，根据硬盘上的 `blk*.dat` 文件重建区块链状态和区块的索引。
+
+-   -reindex-chainstate，根据当前区块的索引重建区块链的状态。
+
+-   -txindex，维护所有交易的索引，被 `getrawtransaction` RPC 命令调用。
+
+-   -addnode=ip，添加一个节点，并连接它，并保持连接。
+
+-   -banscore=n，断开行为不端的同伴的门槛。
+
+-   -bantime=n，不诚实节点重新连接需要的秒数。
+
+-   -bind=addr，绑定到指定的IP，并始终监听它。
+
+-   -connect=ip，仅仅只连接到指定的节点，如果不是ip而是0，则表示禁止自动连接。
+
+-   -discover，是否发现自己的IP地址。
+
+-   -dns，对于 `-addnode`、`-seednode`、`-connect` 总是使用 DNS 查找。
+
+-   -dnsseed，指定如果已有地址比较少，则进行 DNS 查找来获取对等节点。
+
+-   -enablebip61，允许发送 BIP61 定义的拒绝消息。
+
+-   -externalip=ip，指定自身的外部 IP 地址。
+
+-   -forcednsseed，总是通过 DNS 查找来获取对等节点的地址。
+
+-   -listen，接收外部对等节点的连接。
+
+-   -listenonion，自动创建 Tor 隐藏服务。
+
+-   -maxconnections=n，维护到别的节点的最大连接数。
+
+-   -maxreceivebuffer=n，每个对等节点的最大接收缓存。
+
+-   -maxsendbuffer=n，每个对等节点的最大发送缓存。
+
+-   -onion=ip:port，设置 SOCKS5 代理。
+
+-   -peerbloomfilters，支持布隆过滤器过滤区块和交易。
+
+-   -permitbaremultisig，中继非 P2SH 多重签名。
+
+-   -port=port，指定默认的监听端口。
+
+-   -proxy=ip:port，通过 SOCKS5 代理进行连接。
+
+-   -proxyrandomize，随机化每个代理连接的凭据。 从而使Tor流进行隔离。
+
+-   -seednode=ip，指定一个节点来检索其他的节点，随后就从这个接点进行断开。
+
+-   -torcontrol=ip:port，在 onion 启用的情况下，指定 Tor 控制器使用的端口。
+
+-   -torpassword=pass，Tor 控制器的密码。
+
+-   -whitebind=addr，本节点绑定到这个地址上，白名单中的节点通过这个地址连接到节点。
+
+-   -whitelist=IP address or network，当收到连接请求的时候，如果节点在这个白名单中，就直接中继而不用检查。
+
+-   -checkblocks=n，在启动时要检查多少个区块。
+
+-   -checklevel=n，`checkblocks` 验证区块的程度。
+
+-   -checkblockindex，进行完整的一致性检查，包括：mapBlockIndex、setBlockIndexCandidates、chainActive、mapBlocksUnlinked 等。
+
+-   -checkmempool=n，每多少个交易进行检验。
+
+-   -checkpoints，提供检查点，对已知链的历史不进行检验。
+
+-   -deprecatedrpc=method，不赞成使用的 RPC 方法。
+
+-   -limitancestorcount=n，如果交易池中的祖先交易达到或超过指定的值时，不再接收交易。
+
+-   -limitancestorsize=n，如果交易池中的祖先交易大小达到或超过指定的值时，不再接收交易。
+
+-   -limitdescendantcount=n，如果交易池中祖先交易的后代已经达到或超过指定的值时，不再接收交易。
+
+-   -blockmaxweight=n，设置 BIP141 区块的最大 weight。
+
+-   -blockmintxfee=amt，设置包含在创建区块的交易最小费用。
+
+-   -blockversion=n，重写区块版本号，以测试分叉方案。
+
+-   -rest，允许 REST 请求。
+
+-   -rpcallowip=ip，设置允许 JSON-RPC 连接的地址/来源。
+
+-   -rpcauth=userpw，JSON-RPC 连接的用户名和密码哈希。
+
+-   -rpcbind=addr:port，绑定到指定的地址来监听 JSON-RPC 连接。
+
+-   -rpccookiefile=loc，进行验证的的 cookie 位置。
+
+-   -rpcuser=user，JSON-RPC 连接的用户名。
+
+-   -rpcpassword=pw，JSON-RPC 连接的用户密码。
+
+-   -rpcport=port，JSON-RPC连接监听的端口。
+
+-   -rpcservertimeout=n，HTTP 请求的超时时间。
+
+-   -rpcthreads=n，设置服务 RPC 调用的线程数量。
+
+-   -rpcworkqueue=n，设置服务 RPC 调用的工作队列深度。
+
+-   -server，接受命令行和 JSON-RPC 命令。
+
+-   -debug=category，输入调试信息。如果输出类别（category）不指定默认输出所有调试信息。类别包括：addrman、alert、bench、cmpctblock、coindb、db、http、libevent、lock、mempool、mempoolrej、net、proxy、prune、rand、reindex、rpc、selectcoins、tor、zmq、qt 等。
+
+### 钱包相关的参数
+
+钱包相关的参数通过调用 `AddWalletOptions` 方法，被加入 `gArgs` 中。钱包相关的参数有如下这些：
+
+- -addresstype
+
+- -avoidpartialspends
+
+- -changetype
+
+- -disablewallet
+
+- -discardfee=<amt>
+
+- -fallbackfee=<amt>
+
+  当费用估算数据不足时，将使用的费率。
+
+- -keypool=<n>
+
+- -mintxfee=<amt>
+
+- -paytxfee=<amt>
+
+  交易费用。
+
+- -rescan
+
+  在启动时，扫描区块链
+
+- -salvagewallet
+
+- -spendzeroconfchange
+
+  发送交易时，是否可以花费未确认的变更（交易）。
+
+- -txconfirmtarget=<n>
+
+  如果没有设置交易费用，则应包含足够的费用，以便在平均 n 个区块内打包交易。
+
+- -upgradewallet
+
+- -wallet=<path>
+
+- -walletbroadcast
+
+- -walletdir=<dir>
+
+- -walletnotify=<cmd>
+
+- -walletrbf
+
+  发送交易时，是否启用 full-RBF opt-in。
+
+- -zapwallettxes=<mode>
+
+- -dblogsize=<n>
+
+- -flushwallet
+
+- -privdb
+
+- -walletrejectlongchains
+##  4、三种网络的参数
+
+### 主网络
+
+主网络由类 `CMainParams` 表示。在构造函数中，进行如下的设置：
+
+- 网络ID 为 `main`；
+
+- 共识参数（`Consensus::Params`）的各个值：
+
+  - 每隔多少个块（`nSubsidyHalvingInterval`）后续比特币的奖励会减半，值为 210000。根据创世区块奖励的数量（50），根据等比数列求和公式：$$ 50 * (1 / (1 - 0.5)) * 210000 $$，可计算货币总量为 2100W个比特币。
+
+  - BIP34 激活高度（`BIP34Height`）为 227931。
+
+  - BIP34 激活哈希（`BIP34Hash`）为 `0x000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8`。
+
+  - BIP65 激活高度（`BIP65Height`）为 388381。
+
+  - BIP66 激活高度（`BIP66Height`）为 363725。
+
+  - 工作量限制（`powLimit`）为一个大整数。
+
+  - 难度改变的周期（`nPowTargetTimespan`）为 2周。
+
+  - 平均出块时间（`nPowTargetSpacing`）为10分钟。
+
+  - 改变共识需要的区块数（`nRuleChangeActivationThreshold`）为 1916，即 2016 的 95%。
+
+  - 矿工确认窗口（`nMinerConfirmationWindow`）为 2016，等于难度改变周期除以平均出块时间。
+
+  - 接下来设置区块链相关的部署状态，包括：测试相关的（`DEPLOYMENT_TESTDUMMY`）、CSV 软分叉相关的（涉及到 BIP68、BIP112、BIP113）和隔离见证相关的（涉及到 BIP141、BIP143、BIP147）。
+
+  - 最佳区块链的最小工作量。
+
+  - 设置默认端口（`nDefaultPort`）为 8333。
+
+  - 达到多少个区块之后进行区块修剪（`nPruneAfterHeight`），当前值为 100000。
+
+  - 接下来，调用 `CreateGenesisBlock` 方法，生成创世区块。这个方法的参数是固定的，指定了创世区块的时间、随机数、难度值、版本号、奖励等。在方法内部，生成创世区块的输出脚本和输入脚本，中本聪那句著名的评论就出现在创世区块的第一个交易的签名中，他写道：The Times 03/Jan/2009 Chancellor on brink of second bailout for banks。
+
+  - 设置创世区块的哈希为刚生成的创业区块的哈希。
+
+  - 设置 DNS 种子节点 `vSeeds` 集合包含的 DNS 种子，通过解析 DNS 种子节点，比特币节点启动时可以找到更多的对等节点来进行连接。
+
+  - 接下来，设置相关的检查点数据。
 

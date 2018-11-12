@@ -607,3 +607,34 @@ P2P 网络的建立是在系统启动的第 12 步，最后时刻调用 `CConnma
         pfrom->fRelayTxes = true;
         return true;
     }
+
+
+##  10、`mempool` 消息
+
+作为服务器，处理客户端节点发送的设置内存池消息。
+
+代码在 `net_processing.cpp` 文件中的 `ProcessMessage` 方法的 2598 行。
+
+以 `if (strCommand == NetMsgType::MEMPOOL) {` 为标志，具体如下：
+
+
+1.  如果节点没有能力也没有意愿启用 bloom-filtered 连接，并且节点也不在白名单中，则断开节点，并返回真。
+
+        if (!(pfrom->GetLocalServices() & NODE_BLOOM) && !pfrom->fWhitelisted)
+        {
+            pfrom->fDisconnect = true;
+            return true;
+        }
+
+2.  如果内存池请求达到限额，并且节点也不在白名单中，则断开节点，并返回真。
+
+        if (connman->OutboundTargetReached(false) && !pfrom->fWhitelisted)
+        {
+            pfrom->fDisconnect = true;
+            return true;
+        }
+
+3.  设置节点可以发送内存池消息，并返回真。
+
+        pfrom->fSendMempool = true;
+        return true;

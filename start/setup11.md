@@ -34,9 +34,6 @@
 
         {
             WaitableLock lock(cs_GenesisWait);
-            // We previously could hang here if StartShutdown() is called prior to
-            // ThreadImport getting started, so instead we just wait on a timer to
-            // check ShutdownRequested() regularly.
             while (!fHaveGenesis && !ShutdownRequested()) {
                 condvar_GenesisWait.wait_for(lock, std::chrono::milliseconds(500));
             }

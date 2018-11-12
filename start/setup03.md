@@ -220,7 +220,7 @@
                 return true;
             }
 
-    -   确定指定的是单一钱包还是多钱包。
+    -   设置 `-wallet` 参数的默认值为空。确定指定的是单一钱包还是多钱包。
 
             gArgs.SoftSetArg("-wallet", "");
             const bool is_multiwallet = gArgs.GetArgs("-wallet").size() > 1;
