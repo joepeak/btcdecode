@@ -114,7 +114,7 @@
 
         GetMainSignals().RegisterBackgroundSignalScheduler(scheduler);
 
-    **`GetMainSignals` 方法返回类型为 `CMainSignals` 的静态全局变量 g_signals。`CMainSignals` 拥有一个类型为 `MainSignalsInstance` 的智能指针 m_internals。**
+    **`GetMainSignals` 方法返回类型为 `CMainSignals` 的静态全局变量（系统启动时预先进行初始化） g_signals。`CMainSignals` 拥有一个类型为 `MainSignalsInstance` 的智能指针 m_internals。**
 
     `MainSignalsInstance` 是一个结构体，包含了系统的主要信号和一个调度器，包括：
 
