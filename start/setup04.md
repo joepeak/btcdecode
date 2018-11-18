@@ -138,6 +138,8 @@
 
     **`RegisterBackgroundSignalScheduler` 方法生成智能指针 m_internals 对象。在第6步，网络初始化时会指定各种处理器**。
 
+        m_internals.reset(new MainSignalsInstance(&scheduler));
+
     简单介绍下信号槽。什么是信号槽？
 
     -   简单来说，信号槽是观察者模式的一种实现，或者说是一种升华。
@@ -168,7 +170,7 @@
 
     这里及下面的钱包注册 RPC 命令 只讲下每个 RPC 的作用，具体代码与使用后面会进行细讲。如果想要查看系统提供的 RCP 命令/接口，在命令行下输入 `./src/bitcoin-cli -regtest help` 就会显示所有非隐藏的 RPC 命令。如果想要显示某个具体的 RPC 接口，比如 `getblockchaininfo`，执行如下命令 `./src/bitcoin-cli -regtest help getblockchaininfo`，即可显示指定 RPC 的相关信息。
 
-    -   第一步，调用 `RegisterBlockchainRPCCommands` 方法，注册所有关于区块链的 RPC 命令。
+    -   首先，调用 `RegisterBlockchainRPCCommands` 方法，注册所有关于区块链的 RPC 命令。
 
         方法内部会遍历 `commands` 数组，把每一个命令保存到 `CRPCTable` 对象的 `mapCommands` 集合中。
 
@@ -278,7 +280,7 @@
 
         -   syncwithvalidationinterfacequeue
 
-    -   第二步，调用 `RegisterNetRPCCommands` 方法，注册所有关于网络相关的 RPC 命令。
+    -   其次，调用 `RegisterNetRPCCommands` 方法，注册所有关于网络相关的 RPC 命令。
 
         方法内部会遍历 `commands` 数组，把每一个命令保存到 `CRPCTable` 对象的 `mapCommands` 集合中。
 
@@ -332,7 +334,7 @@
 
             禁止或打开所有 P2P 网络活动。
 
-    -   第三步，调用 `RegisterMiscRPCCommands` 方法，注册所有的杂项 RPC 命令。
+    -   再次，调用 `RegisterMiscRPCCommands` 方法，注册所有的杂项 RPC 命令。
 
         方法内部会遍历 `commands` 数组，把每一个命令保存到 `CRPCTable` 对象的 `mapCommands` 集合中。
 
@@ -374,7 +376,7 @@
 
             简单回显输入参数。此命令用于测试。
 
-    -   第四步，调用 `RegisterMiningRPCCommands` 方法，注册所有关于挖矿相关的 RPC 命令。
+    -   再次，调用 `RegisterMiningRPCCommands` 方法，注册所有关于挖矿相关的 RPC 命令。
 
         方法内部会遍历 `commands` 数组，把每一个命令保存到 `CRPCTable` 对象的 `mapCommands` 集合中。
 
@@ -420,7 +422,7 @@
 
             估计交易所需的费用。
 
-    -   第五步，调用 `RegisterRawTransactionRPCCommands` 方法，注册所有关于原始交易的 RPC 命令。
+    -   最后，调用 `RegisterRawTransactionRPCCommands` 方法，注册所有关于原始交易的 RPC 命令。
 
         方法内部会遍历 `commands` 数组，把每一个命令保存到 `CRPCTable` 对象的 `mapCommands` 集合中。
 
@@ -538,7 +540,7 @@
 
             ./src/bitcoin-cli -regtest  createwallet test
 
-       可以用 `listwallets` 显示所有加载的钱包，可以用 `importprivkey` 命令添加一个私钥到钱包。
+        可以用 `listwallets` 显示所有加载的钱包，可以用 `importprivkey` 命令添加一个私钥到钱包。
 
         当有多个钱包时，为了操作某个特定钱包，需要使用 `-rpcwallet=钱包名字`，比如：
 
@@ -761,7 +763,9 @@
 
         立即挖出指定的区块（在RPC返回之前）到钱包中指定的地址。
 
-13. 如果命令参数指定 `server` ，则调用 `AppInitServers` 方法，注册服务器。
+13. 如果命令参数 `-server` 为真，则调用 `AppInitServers` 方法，启动服务器。
+
+    命令参数 `-server` 默认情况下被设置为真。
 
     具体代码如下：
 

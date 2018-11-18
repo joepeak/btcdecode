@@ -51,41 +51,57 @@ main 函数本身没有太多东西，主要是调用3个函数来执行，它�
 
     系统执行的重要一步就是就设置可以接收的参数，解析用户启动时传递的各种参数，`SetupServerArgs` 函数就是完成这个目的。下面来看这个函数的执行流程。
 
-    - 首先，调用 `CreateBaseChainParams` 函数，生成默认的基本参数，包括：使用的数据目录和监听的端口。根据不同的网络类型，主网络使用 8332 端口和指定目录下的当前目录，测试网络使用 18332 端口和指定目录下的 testnet3 子目录，回归测试网络使用 18443 端口和指定目录下的 regtest 子目录。
+    -   首先，调用 `CreateBaseChainParams` 函数，生成默认的基本参数，包括：使用的数据目录和监听的端口。根据不同的网络类型，主网络使用 8332 端口和指定目录下的当前目录，测试网络使用 18332 端口和指定目录下的 testnet3 子目录，回归测试网络使用 18443 端口和指定目录下的 regtest 子目录。
 
-          const auto defaultBaseParams = CreateBaseChainParams(CBaseChainParams::MAIN);
-          const auto testnetBaseParams = CreateBaseChainParams(CBaseChainParams::TESTNET);
-          const auto regtestBaseParams = CreateBaseChainParams(CBaseChainParams::REGTEST);
+            const auto defaultBaseParams = CreateBaseChainParams(CBaseChainParams::MAIN);
+            const auto testnetBaseParams = CreateBaseChainParams(CBaseChainParams::TESTNET);
+            const auto regtestBaseParams = CreateBaseChainParams(CBaseChainParams::REGTEST);
 
-    - 然后，调用 `CreateChainParams` 函数，生成默认的区块链参数。这个方法也会区分不同的网络。
+    -   然后，调用 `CreateChainParams` 函数，生成默认的区块链参数。这个方法也会区分不同的网络。
 
-          const auto defaultChainParams = CreateChainParams(CBaseChainParams::MAIN);
-          const auto testnetChainParams = CreateChainParams(CBaseChainParams::TESTNET);
-          const auto regtestChainParams = CreateChainParams(CBaseChainParams::REGTEST);
+            const auto defaultChainParams = CreateChainParams(CBaseChainParams::MAIN);
+            const auto testnetChainParams = CreateChainParams(CBaseChainParams::TESTNET);
+            const auto regtestChainParams = CreateChainParams(CBaseChainParams::REGTEST);
 
         上面3个对象的定义都在 `chainparams.cpp` 文件中。
 
-    - 接下来，设置一些隐藏的参数。
+    -   接下来，生成并初始化隐藏参数 `hidden_args` 集合。
 
-          std::vector<std::string> hidden_args = {"-h", "-help",
-              "-dbcrashratio", "-forcecompactdb",
-              "-allowselfsignedrootcertificates", "-choosedatadir", "-lang=<lang>", "-min", "-resetguisettings", "-rootcertificates=<file>", "-splash", "-uiplatform"};
+        -   -h
 
-    - 再接下来，设置系统可接收的所有参数。
+        -   -help
 
-      除了 `SetupServerArgs` 方法中直接列出的这些之外，还通过下面三种方法设置了一些参数：
+        -   -dbcrashratio
 
-      - 通过钱包接口（`wallet/init.cpp`）的 `AddWalletOptions` 方法，设置了一些钱包相关的参数；
+        -   -forcecompactdb
 
-      - 通过调用 `SetupChainParamsBaseOptions` 方法，设置了区块链相关的参数；
+        -   -allowselfsignedrootcertificates
 
-      - 通过调用 `AddHiddenArgs` 方法，设置了一些隐藏参数。
+        -   -choosedatadir
 
-      上面是一些常用的参数，通过这些参数可以影响比特币核心的命令。
+        -   -lang=<lang>
 
-      应用开发者比较关注的是 RPC 相关的设置，通过 RPC 接口，我们调用比特币核心提供的多种服务。这些命令通常会在配置文件中进行设置，不用在命令行指定。
+        -   -min
 
-      **具体有哪些参数，可以参考本文的第三部分：系统可接受的参数**
+        -   -resetguisettings
+
+        -   -rootcertificates=<file>
+
+        -   -splash
+
+        -   -uiplatform
+       
+    -   再接下来，设置系统可接收的所有参数及他们的帮助信息。
+
+        除了 `SetupServerArgs` 方法中直接列出的这些之外，还通过下面三种方法设置了一些参数：
+
+        -   通过调用钱包接口（`wallet/init.cpp`）的 `AddWalletOptions` 方法，设置钱包相关的参数；
+
+        -   通过调用 `SetupChainParamsBaseOptions` 方法，设置区块链相关的参数；
+
+        -   通过调用 `AddHiddenArgs` 方法，设置隐藏参数。`hidden_args` 集合除了上面列出的之外，增加了 `-upnp`、`-zmqpubhashblock=<address>`、`-zmqpubhashtx=<address>`、`-zmqpubrawblock=<address>`、`-zmqpubrawtx=<address>`、`-daemon` 等几个。
+
+    **具体有哪些参数，可以参考本文的第三部分：系统可接受的参数**
 
 2.  接下来，检查用户指定命令参数是否正确。
 
@@ -119,7 +135,9 @@ main 函数本身没有太多东西，主要是调用3个函数来执行，它�
 
     -   然后，通过 `GetConfigFile` 方法获取配置文件的绝对路径（方法内部会委托 `AbsPathForConfigVal` 方法进行处理，后者决定根据用户指定的路径或使用默认路径来生成配置文件的绝对路径）。在得到配置文件的绝对路径之后，构造文件输入流，从而读取配置文件 `fs::ifstream stream(GetConfigFile(confPath))`。
 
-    -   在成功构造输入流之后，调用 `ReadConfigStream` 方法开始读取配置文件的内容。方法内部按行读取配置文件，并以键值对的形式保存在 `m_config_args` 集合中。
+    -   在成功构造输入流之后，调用 `ReadConfigStream` 方法开始读取配置文件的内容。
+
+        方法内部按行读取配置文件，并以键值对的形式保存在 `m_config_args` 集合中。
 
 6.  调用 `SelectParams(gArgs.GetChainName())` 函数，生成全局的区块链参数，并设置系统的网络类型。如果有错误，则打印错误，然后退出。
 
@@ -141,9 +159,11 @@ main 函数本身没有太多东西，主要是调用3个函数来执行，它�
 
 8.  设置参数 `-server` 默认为真。
 
+        gArgs.SoftSetBoolArg("-server", true);
+
     bitcoind 守护进程默认 `server` 为真。
 
-8.  调用 `InitLogging` 函数，初始化系统所用日志，并打印系统的版本信息。
+9.  调用 `InitLogging` 函数，初始化系统所用日志，并打印系统的版本信息。
 
     具体代码如下，根据是否指定 `debuglogfile`、`printtoconsole` 等确定日志打印到文件或是控制台。
 
@@ -167,23 +187,31 @@ main 函数本身没有太多东西，主要是调用3个函数来执行，它�
 
 10.  调用 `InitParameterInteraction` 函数，根据参数间的关系，检查所有的交互参数。
 
-10. 调用 `AppInitBasicSetup` 函数，进行基本的设置。如果有错误，则打印错误，然后退出。
+11. 调用 `AppInitBasicSetup` 函数，进行基本的设置。如果有错误，则打印错误，然后退出。
 
-    经过前面漫长的检查与设置，终于开始了应用基本的设置。具体解读见第二部分。
+    经过前面漫长的检查与设置，终于开始了应用基本的设置。
 
-11. 调用 `AppInitSanityChecks` 函数，处理底层加密函数相关内容。
+    具体讲解参见启动过程的第一步。
 
-    具体解读见第二部分。
+12. 调用 `AppInitParameterInteraction` 函数，处理参数的交互设置。
 
-12. 调用 `AppInitLockDataDirectory` 函数，检查并锁定数据目录。
+    具体讲解参见启动过程的第二、三步。
 
-    具体解读见第二部分。
+13. 调用 `AppInitSanityChecks` 函数，处理底层加密函数相关内容。
 
-13. 调用 `AppInitMain` 函数，比特币主要的启动过程。
+    具体讲解参见启动过程的第四步。
 
-    具体解读见第二部分。
+14. 调用 `AppInitLockDataDirectory` 函数，检查并锁定数据目录。
 
-14. 如果应用初始化主函数出错，则调用 `Interrupt` 函数进行中止，否则调用 `WaitForShutdown` 函数等待系统结束。
+    方法内部调用 `LockDataDirectory` 方法，锁定数据目录。如果锁定失败，则返回假，否则，返回真。
+
+    锁定数据目录的目的是为了防止多个客户端同时启动。
+
+15. 调用 `AppInitMain` 函数，比特币主要的启动过程。
+
+    具体讲解参见启动过程的第四a 到十三步。
+
+16. 如果应用初始化主函数出错，则调用 `Interrupt` 函数进行中止，否则调用 `WaitForShutdown` 函数等待系统结束。
 
     `WaitForShutdown` 函数是一个无限循环函数。
 
@@ -401,49 +429,133 @@ main 函数本身没有太多东西，主要是调用3个函数来执行，它�
 - -privdb
 
 - -walletrejectlongchains
+
+
 ##  4、三种网络的参数
+
 
 ### 主网络
 
 主网络由类 `CMainParams` 表示。在构造函数中，进行如下的设置：
 
-- 网络ID 为 `main`；
+1.  网络ID `strNetworkID` 为 `main`；
 
-- 共识参数（`Consensus::Params`）的各个值：
+2.  共识参数（`Consensus::Params`）的各个值：
 
-  - 每隔多少个块（`nSubsidyHalvingInterval`）后续比特币的奖励会减半，值为 210000。根据创世区块奖励的数量（50），根据等比数列求和公式：$$ 50 * (1 / (1 - 0.5)) * 210000 $$，可计算货币总量为 2100W个比特币。
+    -   每隔多少个块（`nSubsidyHalvingInterval`）后续比特币的奖励会减半，值为 210000。
 
-  - BIP34 激活高度（`BIP34Height`）为 227931。
+        根据创世区块奖励的数量（50），根据等比数列求和公式：$$ 50 * (1 / (1 - 0.5)) * 210000 $$，可计算货币总量为 2100W个比特币。
 
-  - BIP34 激活哈希（`BIP34Hash`）为 `0x000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8`。
+    -   BIP16Exception
 
-  - BIP65 激活高度（`BIP65Height`）为 388381。
+        `0x00000000000002dc756eebf4f49723ed8d30cc28a5f108eb94b1ba88ac4f9c22`
 
-  - BIP66 激活高度（`BIP66Height`）为 363725。
+    -   BIP34 激活高度（`BIP34Height`）为 227931。
 
-  - 工作量限制（`powLimit`）为一个大整数。
+    -   BIP34 激活哈希`BIP34Hash`
 
-  - 难度改变的周期（`nPowTargetTimespan`）为 2周。
+        `0x000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8`
 
-  - 平均出块时间（`nPowTargetSpacing`）为10分钟。
+    -   BIP65 激活高度 `BIP65Height`
 
-  - 改变共识需要的区块数（`nRuleChangeActivationThreshold`）为 1916，即 2016 的 95%。
+        388381
 
-  - 矿工确认窗口（`nMinerConfirmationWindow`）为 2016，等于难度改变周期除以平均出块时间。
+    -   BIP66 激活高度 `BIP66Height`
 
-  - 接下来设置区块链相关的部署状态，包括：测试相关的（`DEPLOYMENT_TESTDUMMY`）、CSV 软分叉相关的（涉及到 BIP68、BIP112、BIP113）和隔离见证相关的（涉及到 BIP141、BIP143、BIP147）。
+        363725
 
-  - 最佳区块链的最小工作量。
+    -   工作量限制`powLimit`
 
-  - 设置默认端口（`nDefaultPort`）为 8333。
+        `00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff`。
 
-  - 达到多少个区块之后进行区块修剪（`nPruneAfterHeight`），当前值为 100000。
+    -   难度改变的周期 `nPowTargetTimespan`
 
-  - 接下来，调用 `CreateGenesisBlock` 方法，生成创世区块。这个方法的参数是固定的，指定了创世区块的时间、随机数、难度值、版本号、奖励等。在方法内部，生成创世区块的输出脚本和输入脚本，中本聪那句著名的评论就出现在创世区块的第一个交易的签名中，他写道：The Times 03/Jan/2009 Chancellor on brink of second bailout for banks。
+        2周，`14 * 24 * 60 * 60` 秒
 
-  - 设置创世区块的哈希为刚生成的创业区块的哈希。
+    -   平均出块时间 `nPowTargetSpacing`
 
-  - 设置 DNS 种子节点 `vSeeds` 集合包含的 DNS 种子，通过解析 DNS 种子节点，比特币节点启动时可以找到更多的对等节点来进行连接。
+        10分钟，`10 * 60`。
 
-  - 接下来，设置相关的检查点数据。
+    -   改变共识需要的区块数 `nRuleChangeActivationThreshold`
 
+        1916 个区块，即 2016 的 95%
+
+    -   矿工确认窗口 `nMinerConfirmationWindow`
+
+        2016，等于难度改变周期除以平均出块时间。
+
+    -   区块链相关的部署状态，包括：
+
+        -   测试相关的 `DEPLOYMENT_TESTDUMMY`
+
+        -   CSV 软分叉相关的，涉及到 BIP68、BIP112、BIP113
+
+        -   隔离见证相关的，涉及到 BIP141、BIP143、BIP147。
+
+    -   最佳区块链的最小工作量
+
+        `0x0000000000000000000000000000000000000000028822fef1c230963535a90d`
+
+    -   创世区块的哈希
+
+        值为 `CreateGenesisBlock` 方法生成的创世区块的哈希。
+
+3.  设置默认端口 `nDefaultPort`
+
+    8333
+
+4.  达到多少个区块之后进行区块修剪 `nPruneAfterHeight`
+
+    100000
+
+5.  设置 DNS 种子节点 `vSeeds` 集合包含的 DNS 种子
+
+        通过解析 DNS 种子节点，比特币节点启动时可以找到更多的对等节点来进行连接。
+
+6.  `base58Prefixes` 集合中各个前缀
+
+    包括以下几种：
+
+    -   公钥地址
+
+        两个字符：1、0
+
+    -   脚本地址
+
+        两个字符：1、5
+
+    -   密钥前缀
+
+        两个字符：1、128
+
+    -   扩展公钥
+
+    -   扩展密钥
+
+7.  bech32_hrp
+
+    bc
+
+8.  vFixedSeeds
+
+    固定的种子节点
+
+9.  fDefaultConsistencyChecks
+
+    假
+
+10. fRequireStandard
+
+    真
+
+11. fMineBlocksOnDemand
+
+    不进行挖矿
+
+12. checkpointData
+
+13. chainTxData
+
+14. m_fallback_fee_enabled
+
+    禁止回退费用

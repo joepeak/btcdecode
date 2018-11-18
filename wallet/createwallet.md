@@ -51,7 +51,7 @@
 8.  返回钱包名字和警告信息组成的对象。
 
 
-##  创建钱包方法 CreateWalletFromFile
+##  1、CreateWalletFromFile 创建钱包入口
 
 这个方法接收 3 个参数，第一个参数是钱包的名称，第二个参数是钱包的绝对路径，第三个参数是钱包的标志。具体逻辑如下：
 
@@ -92,7 +92,7 @@
 
     为什么要清理钱包数据库中的交易呢？因为有交易费用过低，导致无法打包到区块中，对于这些交易我们需要从钱包文件中清理出去。
 
-3.  生成两个变量，一个是当前时间，一个是表示第一次运行钱包的标志。
+3.  生成两个变量，一个是当前时间，一个是表示是否第一次创建钱包。
 
         int64_t nStart = GetTimeMillis();
         bool fFirstRun = true;
@@ -101,42 +101,20 @@
 
         std::shared_ptr<CWallet> walletInstance(new CWallet(name, WalletDatabase::Create(path)), ReleaseWallet);
 
-4.  调用钱包对象的 `LoadWallet` 方法加载钱包。如果出现错误，则进行相应的处理。
+5.  调用钱包对象的 `LoadWallet` 方法，加载钱包。
 
         DBErrors nLoadWalletRet = walletInstance->LoadWallet(fFirstRun);
-        if (nLoadWalletRet != DBErrors::LOAD_OK)
-        {
-            if (nLoadWalletRet == DBErrors::CORRUPT) {
-                InitError(strprintf(_("Error loading %s: Wallet corrupted"), walletFile));
-                return nullptr;
-            }
-            else if (nLoadWalletRet == DBErrors::NONCRITICAL_ERROR)
-            {
-                InitWarning(strprintf(_("Error reading %s! All keys read correctly, but transaction data or address book entries might be missing or incorrect."),
-                    walletFile));
-            }
-            else if (nLoadWalletRet == DBErrors::TOO_NEW) {
-                InitError(strprintf(_("Error loading %s: Wallet requires newer version of %s"), walletFile, _(PACKAGE_NAME)));
-                return nullptr;
-            }
-            else if (nLoadWalletRet == DBErrors::NEED_REWRITE)
-            {
-                InitError(strprintf(_("Wallet needed to be rewritten: restart %s to complete"), _(PACKAGE_NAME)));
-                return nullptr;
-            }
-            else {
-                InitError(strprintf(_("Error loading %s"), walletFile));
-                return nullptr;
-            }
-        }
+ 
+    如果加载过程出现错误，则进行相应的处理，错误我们这里不讲，具体自己看代码。我们重点看下 `LoadWallet` 方法的逻辑。
 
-    钱包对象 `LoadWallet` 方法的主体是生成一个可以访问钱包的数据库的对象，从而调用钱包数据库对象的的 `LoadWallet` 方法来加载钱包。从钱包数据库中加载钱包的方法在下面详细说明，此处略过。
+    -   重置参数 `fFirstRunRet` 为假。
 
-        DBErrors CWallet::LoadWallet(bool& fFirstRunRet)
-        {
-            LOCK2(cs_main, cs_wallet);
-            fFirstRunRet = false;
+    -   生成一个可以访问钱包的数据库的对象，从而调用钱包数据库对象的的 `LoadWallet` 方法来加载钱包。从钱包数据库中加载钱包的方法在下面详细说明，此处略过。
+
             DBErrors nLoadWalletRet = WalletBatch(*database,"cr+").LoadWallet(this);
+
+    -   如果从数据库读取钱包数据结果为 `NEED_REWRITE`，并且数据库重写 `x04pool` 成功，那么设置钱包的内部密钥池、外部密钥池、密钥索引集合等为空。
+
             if (nLoadWalletRet == DBErrors::NEED_REWRITE)
             {
                 if (database->Rewrite("\x04pool"))
@@ -146,25 +124,22 @@
                     m_pool_key_to_index.clear();
                 }
             }
-            {
-                LOCK(cs_KeyStore);
-                fFirstRunRet = mapKeys.empty() && mapCryptedKeys.empty() && mapWatchKeys.empty() && setWatchOnly.empty() && mapScripts.empty() && !IsWalletFlagSet(WALLET_FLAG_DISABLE_PRIVATE_KEYS);
-            }
-            if (nLoadWalletRet != DBErrors::LOAD_OK)
-                return nLoadWalletRet;
 
-            return DBErrors::LOAD_OK;
-        }
+    -   如果 `mapKeys`、`mapCryptedKeys`、`mapWatchKeys`、`setWatchOnly`、`mapScripts` 4个集合为空，且钱包没有设置禁止私钥，那么设置 `fFirstRunRet` 为真。
 
-5.  如果启动参数 `-upgradewallet` 为真，或者没有指定启动参数 `-upgradewallet` 为假，但是第一次运行创建这个钱包，那么进行如下处理：
+            fFirstRunRet = mapKeys.empty() && mapCryptedKeys.empty() && mapWatchKeys.empty() && setWatchOnly.empty() && mapScripts.empty() && !IsWalletFlagSet(WALLET_FLAG_DISABLE_PRIVATE_KEYS);
 
-    -   获取启动参数 `-upgradewallet` 的值，默认为0，保存到变量 `nMaxVersion` 中。
+    -   返回数据库读取的结果。
+    
+6.  如果启动参数 `-upgradewallet` 为真，或者没有指定启动参数 `-upgradewallet` ，但是第一次运行运行这个钱包，那么进行如下处理：
+
+    -   获取用户指定升级的版本，保存为要升级的版本。
 
             int nMaxVersion = gArgs.GetArg("-upgradewallet", 0);
 
-    -   如果变量 `nMaxVersion` 为0，即没有指定启动参数，那么设置 `nMaxVersion` 等于 `FEATURE_LATEST（目前为 169900）`，即支持 HD 分割，同时调用钱包对象的 `SetMinVersion` 方法，设置钱包最小版本为这个版本。
+    -   如果要升级的版本为0，即用户没有指定具体升级到哪个版本，那么设置要升级的版本等于 `FEATURE_LATEST（目前为 169900）`，即支持 HD 分割，同时调用钱包对象的 `SetMinVersion` 方法，设置钱包最小版本为这个要升级的版本。
 
-            if (nMaxVersion == 0) // the -upgradewallet without argument case
+            if (nMaxVersion == 0)
             {
                 walletInstance->WalletLogPrintf("Performing wallet upgrade to %i\n", FEATURE_LATEST);
                 nMaxVersion = FEATURE_LATEST;
@@ -173,7 +148,7 @@
             else
                 walletInstance->WalletLogPrintf("Allowing wallet upgrade up to %i\n", nMaxVersion);
 
-    -   如果变量 `nMaxVersion` 小于钱包当前的版本，则直接返回空指针。
+    -   如果要升级的版本小于钱包当前的版本，则直接返回空指针。
 
             int nMaxVersion = gArgs.GetArg("-upgradewallet", 0);
             if (nMaxVersion < walletInstance->GetVersion())
@@ -182,11 +157,11 @@
                 return nullptr;
             }
 
-    -   调用钱包对象的 `SetMinVersion` 方法，设置钱包最大版本。
+    -   调用钱包对象的 `SetMinVersion` 方法，设置钱包最大版本为要升级的版本。
 
             walletInstance->SetMaxVersion(nMaxVersion);
 
-6.  如果没有指定启动参数 `-upgradewallet` ，或者指定了但为假，那么升级到 HD 钱包。具体处理如下：
+7.  如果指定启动参数 `-upgradewallet` 为真，那么显式升级到 HD 钱包。具体处理如下：
 
     -   如果钱包不支持 `FEATURE_HD_SPLIT`，并且钱包的版本大于等于 139900 （`FEATURE_HD_SPLIT`）且小于等于 169900 （`FEATURE_PRE_SPLIT_KEYPOOL`），则返回空指针。
 
@@ -195,7 +170,7 @@
                 return nullptr;
             }
 
-    -   如果钱包支持 `FEATURE_HD`，且当前没有启用 HD，那么调用 `SetMinVersion` 方法，设置最小版本为 `FEATURE_HD`，同时调用 `GenerateNewSeed` 生成新的随机种子，然后调用 `SetHDSeed` 方法来设置随机种子。
+    -   如果钱包支持 `FEATURE_HD`，且当前没有启用 HD，那么调用 `SetMinVersion` 方法，设置最小版本为 `FEATURE_HD`，同时调用 `GenerateNewSeed` 方法，生成新的公钥，然后调用 `SetHDSeed` 方法，把新生成的公钥作为 HD 链的随机种子。
 
             bool hd_upgrade = false;
             bool split_upgrade = false;
@@ -205,6 +180,8 @@
                 walletInstance->SetHDSeed(masterPubKey);
                 hd_upgrade = true;
             }
+
+        `GenerateNewSeed` 方法在下面进行详细说明。
 
     -   如果钱包支持 `FEATURE_HD_SPLIT`，那么调用 `SetMinVersion` 方法，设置最小版本为 `FEATURE_HD_SPLIT`。如果 `FEATURE_HD_SPLIT` 大于先前的版本，则设置变量 `split_upgrade` 为真。
 
@@ -229,7 +206,13 @@
                 }
             }
 
-7.  如果是第一次运行，即第一次创建这个钱包，那么：
+        `TopUpKeyPool` 方法在下面进行详细说明。
+
+8.  如果是第一次创建钱包，那么进行下面的处理。
+
+    `fFirstRun` 变量表示是否是第一次创建钱包。系统在运行时，每一次通过 `createwallet` RPC 来创建钱包时，这个变量都是真，即第一次运行，那什么时候这个变量会是假呢？答案是，在钱包创建之后，比特币客户端被关掉并再次启动之后，这个变量就在钱包对象的 `LoadWallet` 方法中被设置为假，即不是第一次运行。
+
+    所以以下逻辑只有在创建默认钱包时才会执行。
 
     -   设置钱包最小版本为 `FEATURE_LATEST`，当前为 `FEATURE_PRE_SPLIT_KEYPOOL`。
 
@@ -244,23 +227,42 @@
                 walletInstance->SetHDSeed(seed);
             }
 
+        `GenerateNewSeed` 方法，下面进行讲解。
+
     -   如果创建参数没有指定不能包含私钥，那么填充密钥池。如果失败，即不能生成初始密钥，则返回空指针。
 
             if (!walletInstance->IsWalletFlagSet(WALLET_FLAG_DISABLE_PRIVATE_KEYS) && !walletInstance->TopUpKeyPool()) {
                 return nullptr;
             }
 
+        `TopUpKeyPool` 方法，下面进行讲解。
+
     -   刷新到数据库。
 
             walletInstance->ChainStateFlushed(chainActive.GetLocator());
 
-8.  否则，如果创建参数指定不能包含私钥，那么返回 NULL。
+9.  否则，如果创建参数指定不能包含私钥，那么返回 NULL。
 
-9.  如果指定了启动参数 `-addresstype`，但是解析失败，则返回空指针。
+        else if (wallet_creation_flags & WALLET_FLAG_DISABLE_PRIVATE_KEYS) {
+            InitError(strprintf(_("Error loading %s: Private keys can only be disabled during creation"), walletFile));
+            return NULL;
+        }
 
-10. 如果指定了启动参数 `-changetype`，但是解析失败，则返回空指针。
+10.  如果指定了启动参数 `-addresstype`，但是解析失败，则返回空指针。
 
-11. 如果设置了最小交易费用，则解析并设置钱包的最小交易费用。
+            if (!gArgs.GetArg("-addresstype", "").empty() && !ParseOutputType(gArgs.GetArg("-addresstype", ""), walletInstance->m_default_address_type)) {
+                InitError(strprintf("Unknown address type '%s'", gArgs.GetArg("-addresstype", "")));
+                return nullptr;
+            }
+
+11. 如果指定了启动参数 `-changetype`，但是解析失败，则返回空指针。
+
+        if (!gArgs.GetArg("-changetype", "").empty() && !ParseOutputType(gArgs.GetArg("-changetype", ""), walletInstance->m_default_change_type)) {
+            InitError(strprintf("Unknown change type '%s'", gArgs.GetArg("-changetype", "")));
+            return nullptr;
+        }
+
+12. 如果设置了最小交易费用，则解析并设置钱包的最小交易费用。
 
         if (gArgs.IsArgSet("-mintxfee")) {
             CAmount n = 0;
@@ -270,7 +272,7 @@
             walletInstance->m_min_fee = CFeeRate(n);
         }
 
-12. 根据不同网络取得是否启用回退费用。如果启动参数设置了 `-fallbackfee` 用以在估算费用不足时将使用的费率，那么就解析设置的费率，如果解析错误，则打印错误日志，并返回空指针，如果解析OK，但是大于规定的最大值，则打印警告日志。如果两者都没有问题，则设置钱包的回退费率。
+13. 根据不同网络取得是否启用回退费用。如果启动参数设置了 `-fallbackfee` 用以在估算费用不足时将使用的费率，那么就解析设置的费率，如果解析错误，则打印错误日志，并返回空指针，如果解析OK，但是大于规定的最大值，则打印警告日志。如果两者都没有问题，则设置钱包的回退费率。
 
         walletInstance->m_allow_fallback_fee = Params().IsFallbackFeeEnabled();
         if (gArgs.IsArgSet("-fallbackfee")) {
@@ -287,7 +289,7 @@
             walletInstance->m_allow_fallback_fee = nFeePerK != 0; //disable fallback fee in case value was set to 0, enable if non-null value
         }
 
-13. 如果启动参数设置了 `-discardfee` 用以规定在费用小于多少时舍弃，那么就解析设置的费率，如果解析错误，则打印错误日志，并返回空指针，如果解析OK，但是大于规定的最大值，则打印警告日志。如果两者都没有问题，则设置钱包的丢弃费率。
+14. 如果启动参数设置了 `-discardfee` 用以规定在费用小于多少时舍弃，那么就解析设置的费率，如果解析错误，则打印错误日志，并返回空指针，如果解析OK，但是大于规定的最大值，则打印警告日志。如果两者都没有问题，则设置钱包的丢弃费率。
 
         if (gArgs.IsArgSet("-discardfee")) {
             CAmount nFeePerK = 0;
@@ -302,7 +304,7 @@
             walletInstance->m_discard_rate = CFeeRate(nFeePerK);
         }
 
-14. 如果启用参数设置了 `-paytxfee` 指定交易费用，那么就解析设置的费率，如果解析错误，则打印错误日志，并返回空指针，如果解析OK，但是大于规定的最大值，则打印警告日志。如果两者都没有问题，则设置钱包的交易费用。如果交易费用小于规定的最小值，则认为交易费用为为，则打印警告日志，并返回空指针。
+15. 如果启用参数设置了 `-paytxfee` 指定交易费用，那么就解析设置的费率，如果解析错误，则打印错误日志，并返回空指针，如果解析OK，但是大于规定的最大值，则打印警告日志。如果两者都没有问题，则设置钱包的交易费用。如果交易费用小于规定的最小值，则认为交易费用为为，则打印警告日志，并返回空指针。
 
         if (gArgs.IsArgSet("-paytxfee")) {
           CAmount nFeePerK = 0;
@@ -322,32 +324,37 @@
           }
         }
 
-15. 设置交易确认的平均区块数（默认为6）、是否发送未确认的变更、是否启用 full-RBF opt-in。
+16. 设置交易确认的平均区块数（默认为6）、是否发送未确认的变更、是否启用 full-RBF opt-in。
 
         walletInstance->m_confirm_target = gArgs.GetArg("-txconfirmtarget", DEFAULT_TX_CONFIRM_TARGET);
         walletInstance->m_spend_zero_conf_change = gArgs.GetBoolArg("-spendzeroconfchange", DEFAULT_SPEND_ZEROCONF_CHANGE);
         walletInstance->m_signal_rbf = gArgs.GetBoolArg("-walletrbf", DEFAULT_WALLET_RBF);
 
-16. 接下来填充密钥池，如果钱包被锁定，则不进行任何操作。
+17. 接下来填充密钥池，如果钱包被锁定，则不进行任何操作。
 
         walletInstance->TopUpKeyPool();
 
-17. 获取区块链的创世区块索引。如果没有指定重新扫描区块链，或指定不扫描，那么进行下面的操作。
+    `TopUpKeyPool` 下面进行详述讲解，此处不提。
 
-    生成一个可以访问钱包数据库的对象，然后从数据库读取最佳区块，即关键字为 `bestblock` 的区块。如果可以找到这个区块，那么调用 `FindForkInGlobalIndex` 方法，返回分叉的区块。
-
-    最佳区块是一个区块定位器，它描述了块链中到另一个节点的位置，这样如果另一个节点没有相同的分支，它就可以找到最近的公共中继。
+18. 获取区块链的创世区块索引。
 
         CBlockIndex *pindexRescan = chainActive.Genesis();
-        if (!gArgs.GetBoolArg("-rescan", false))
-        {
+
+    `pindexRescan` 表示需要重新扫描区块链的区块，默认从创世区块开始，下面会进行重新设置。
+
+19. 如果没有指定重新扫描区块链，或指定不扫描，那么进行下面的操作。
+
+    -   生成一个可以访问钱包数据库的 `batch` 对象。
+
             WalletBatch batch(*walletInstance->database);
+
+    -   调用 `batch` 对象的 `ReadBestBlock` 方法，从数据库读取最佳区块，即关键字为 `bestblock` 的区块。如果可以找到这个区块，那么调用 `FindForkInGlobalIndex` 方法，返回分叉的区块。
+
             CBlockLocator locator;
             if (batch.ReadBestBlock(locator))
                 pindexRescan = FindForkInGlobalIndex(chainActive, locator);
-        }
 
-    `pindexRescan` 为重新扫描区块链的区块，默认从创世区块开始，下面会进行重新设置。
+        其实最佳区块不是一个区块，而是一个区块定位器，它描述了块链中到另一个节点的位置，这样如果另一个节点没有相同的分支，它就可以找到最近的公共中继。
 
     `FindForkInGlobalIndex` 方法根据区块定位器中包含的区块哈希在区块索引集合 `mapBlockIndex` 中查找对应的区块。如果这个区块索引存在，进一步如果当前区块链中包含这个区块索引，则返回这个区块索引，否则如果这个区块索引的祖先是当前区块链的顶部区块，则返回当前区块链的顶部区块。最后，如果找不到这样的区块，则返回当前区块链的创世区块。
 
@@ -367,11 +374,11 @@
             return chain.Genesis();
         }
 
-18. 设置钱包最后一个处理的区块为当前区块链顶部的区块。
+20. 设置钱包最后一个处理的区块为当前区块链顶部的区块。
 
         walletInstance->m_last_block_processed = chainActive.Tip();
 
-19. 如果当前区块链顶部的区块存在，且不等于前一步中我们找到的 `pindexRescan` 对应的区块，那么进行下面的处理：
+21. 如果当前区块链顶部的区块存在，且不等于前一步中我们找到的 `pindexRescan` 对应的区块，那么进行下面的处理：
 
     -   如果当前是修剪模式，从区块链顶部的区块开始向下遍历，一直找到某个区块的前一区块的数据不在区块数据库文件或，或者前一个区块的交易数为0，或者这个区块是 `pindexRescan`。如果最终找到的区块不是 `pindexRescan`，那么打印错误消息，并返回空指针。
 
@@ -507,16 +514,573 @@
                 }
             }
 
-20. 调用全局方法 `RegisterValidationInterface` 注册钱包绑定方法作为信号处理器。
+22. 调用全局方法 `RegisterValidationInterface` 方法，注册钱包通过 `boost::bind` 方法返回的绑定方法作为信号处理器。
 
-21.  调用钱包对象的 `SetBroadcastTransactions` 方法，根据启动参数设置是否广播交易。
+    钱包对象继承了 `CValidationInterface` 接口，实现了以下几个方法：
 
-22. 返回钱包对象。
+    -   TransactionAddedToMempool
+
+    -   BlockConnected
+
+    -   BlockDisconnected
+
+    -   TransactionRemovedFromMempool
+
+    -   ResendWalletTransactions
+
+23.  调用钱包对象的 `SetBroadcastTransactions` 方法，根据启动参数设置是否广播交易。
+
+            walletInstance->SetBroadcastTransactions(gArgs.GetBoolArg("-walletbroadcast", DEFAULT_WALLETBROADCAST));
+
+    方法内部设置钱包对象的 `fBroadcastTransactions` 属性值。
+
+24. 返回钱包对象。
 
 
-##  从数据库中读取钱包的 LoadWallet 方法
+##  重要方法
 
-在这里，我们仔细看下钱包数据库的 `LoadWallet` 方法。这个方法的执行逻辑如下：
+### 2.1、GenerateNewSeed
+
+这个方法主要用来生成私钥/公钥，在生成公钥后，调用钱包对象的 `SetHDSeed` 方法，根据公钥生成一个 `CHDChain` 对象，把公钥经过 SHA256、RIPEMD160 两次哈希返回后的 20个字节 180 位字符串作为它的 `seed_id` 属性，从而以后可以衍生更的扩展公钥。
+
+    void CWallet::SetHDSeed(const CPubKey& seed)
+    {
+        LOCK(cs_wallet);
+        CHDChain newHdChain;
+        newHdChain.nVersion = CanSupportFeature(FEATURE_HD_SPLIT) ? CHDChain::VERSION_HD_CHAIN_SPLIT : CHDChain::VERSION_HD_BASE;
+        newHdChain.seed_id = seed.GetID();
+        SetHDChain(newHdChain, false);
+    }
+
+
+在创建钱包的过程中，本方法及下面的 `TopUpKeyPool` 方法，可能会被调用两次，一次在第一次创建钱包时，另一次在用户明确升级，且钱包支持 HD，但 HD 没启用的情况下。
+
+下面，我们开始正式讲解这个方法。
+
+1.  首先，生成并调用私钥的 `MakeNewKey` 来初始化私钥。
+
+        CKey key;
+        key.MakeNewKey(true);
+
+2.  然后，调用 `DeriveNewSeed` 方法，生成并返回私钥对应的公钥。
+
+        return DeriveNewSeed(key);
+
+我们先来看 `MakeNewKey` 这个方法。这个方法比较简单，但是非常重要，因为正是这个方法，生成了真正意义上的私钥。
+
+    void CKey::MakeNewKey(bool fCompressedIn) {
+        do {
+            GetStrongRandBytes(keydata.data(), keydata.size());
+        } while (!Check(keydata.data()));
+        fValid = true;
+        fCompressed = fCompressedIn;
+    }
+
+`GetStrongRandBytes` 方法，正是生成私钥的过程。这个方法的执行逻辑如下：
+
+1.  生成一个 SHA512对象和一个无符号字符数组。
+
+        CSHA512 hasher;
+        unsigned char buf[64];
+
+2.  首先，调用 `RandAddSeedPerfmon` 方法，通过 OpenSSL's RNG 生成随机数，并进行 SHA512 哈希。
+
+        RandAddSeedPerfmon();
+        GetRandBytes(buf, 32);
+        hasher.Write(buf, 32);
+
+3.  然后，调用 `GetOSRand` 方法，通过 OS RNG 生成随机数，并进行 SHA512 哈希。
+
+        GetOSRand(buf);
+        hasher.Write(buf, 32);
+
+4.  最后，如果 HW 可用，通过 HW 生成随机数，并进行 SHA512 哈希。
+
+        if (GetHWRand(buf)) {
+            hasher.Write(buf, 32);
+        }
+
+5.  接下来，合并并更新状态。
+
+        {
+            WAIT_LOCK(cs_rng_state, lock);
+            hasher.Write(rng_state, sizeof(rng_state));
+            hasher.Write((const unsigned char*)&rng_counter, sizeof(rng_counter));
+            ++rng_counter;
+            hasher.Finalize(buf);
+            memcpy(rng_state, buf + 32, 32);
+        }
+
+6.  然后，把 `buf` 数组中的内容拷贝到输出参数中，并清空数组中的内容。
+
+        memcpy(out, buf, num);
+        memory_cleanse(buf, 64);
+
+`Check` 方法内部通过调用 `secp256k1_ec_seckey_verify` 方法，检查私钥的数据是否满足要求，后者正是椭圆曲线算法相关的。
+
+接下来，我们来看 `DeriveNewSeed` 方法是如何生成公钥的。方法执行逻辑如下：
+
+1.  生成当前时间，并用当前时间初始化蜜钥元数据。
+
+        int64_t nCreationTime = GetTime();
+        CKeyMetadata metadata(nCreationTime);
+
+2.  调用私钥的 `GetPubKey` 方法，生成公钥。
+
+    方法内部正是通过椭圆曲线算法来生成私钥对应的公钥。代码如下，有兴趣的读者可以自行研究。
+
+        assert(fValid);
+        secp256k1_pubkey pubkey;
+        size_t clen = CPubKey::PUBLIC_KEY_SIZE;
+        CPubKey result;
+        int ret = secp256k1_ec_pubkey_create(secp256k1_context_sign, &pubkey, begin());
+        assert(ret);
+        secp256k1_ec_pubkey_serialize(secp256k1_context_sign, (unsigned char*)result.begin(), &clen, &pubkey, fCompressed ? SECP256K1_EC_COMPRESSED : SECP256K1_EC_UNCOMPRESSED);
+        assert(result.size() == clen);
+        assert(result.IsValid());
+        return result;
+
+3.  执行 `assert(key.VerifyPubKey(seed));` 方法，验证公钥确实有私钥相匹配。
+
+4.  设置蜜钥元数据的两个属性。
+
+        metadata.hdKeypath     = "s";
+        metadata.hd_seed_id = seed.GetID();
+
+    `GetID` 方法，用公钥的数据经过 SHA256、RIPEMD160 两次哈希后生成的字符串来生成一个 `CKeyID` 对象。
+
+5.  把密钥元数据保存在 `mapKeyMetadata` 集合中。
+
+        mapKeyMetadata[seed.GetID()] = metadata;
+
+6.  调用 `AddKeyPubKey` 方法，把私钥/公钥及元数据保存到数据库。如果出错，抛出一个异常。
+
+        if (!AddKeyPubKey(key, seed))
+            throw std::runtime_error(std::string(__func__) + ": AddKeyPubKey failed");
+
+    `AddKeyPubKey` 方法生成一个访问数据库的对象，然后调用钱包对象的 `AddKeyPubKeyWithDB` 方法来保存密钥数据。后者的执行流程如下：
+
+    -   如果变量 `encrypted_batch` 为空，那么设置变量 `needsDB` 为真。如果后者为真，那么设置 `encrypted_batch` 属性为参数指定的对象。
+
+            bool needsDB = !encrypted_batch;
+            if (needsDB) {
+                encrypted_batch = &batch;
+            }
+
+    -   调用 `CCryptoKeyStore::AddKeyPubKey` 方法，保存私钥和公钥。如果不成功，进一步，如果变量 `needsDB` 为真，则设置变量 `encrypted_batch` 为假。
+
+            if (!CCryptoKeyStore::AddKeyPubKey(secret, pubkey)) {
+                if (needsDB) encrypted_batch = nullptr;
+                return false;
+            }
+
+        `CCryptoKeyStore::AddKeyPubKey` 方法内部执行逻辑如下：
+
+        -   如果没有加密，那么调用 `CBasicKeyStore::AddKeyPubKey` 来保存私钥和公钥，然后返回。
+
+                if (!IsCrypted()) {
+                    return CBasicKeyStore::AddKeyPubKey(key, pubkey);
+                }
+
+            `IsCrypted` 方法，初始化时是没有加密的，只有在执行加锁、解锁、添加加密密钥的情况下才会是加密的。当前情景是没有加密的，所以执行基类的方法来保存私钥和公钥。
+
+            `CBasicKeyStore::AddKeyPubKey` 方法，首先把私钥保存在 `mapKeys` 集合中，然后调用 `ImplicitlyLearnRelatedKeyScripts` 方法来处理脚本，因为公钥默认是压缩的，所以在方法内会生成脚本，并把脚本保存在 `mapScripts` 集合中。
+
+                bool CBasicKeyStore::AddKeyPubKey(const CKey& key, const CPubKey &pubkey)
+                {
+                    LOCK(cs_KeyStore);
+                    mapKeys[pubkey.GetID()] = key;
+                    ImplicitlyLearnRelatedKeyScripts(pubkey);
+                    return true;
+                }
+
+        -   如果是锁定的，那么返回假。
+
+                if (IsLocked()) {
+                    return false;
+                }
+
+            `IsLocked` 方法，首先调用 `IsCrypted` 方法，确定是否是加密的，如果不是加密的，则直接返回假；否则，把 `vMasterKey` 集合清空。
+
+                bool CCryptoKeyStore::IsLocked() const
+                {
+                    if (!IsCrypted()) {
+                        return false;
+                    }
+                    LOCK(cs_KeyStore);
+                    return vMasterKey.empty();
+                }
+
+        -   接下来，生成加密私钥。
+
+                std::vector<unsigned char> vchCryptedSecret;
+                CKeyingMaterial vchSecret(key.begin(), key.end());
+                if (!EncryptSecret(vMasterKey, vchSecret, pubkey.GetHash(), vchCryptedSecret)) {
+                    return false;
+                }
+
+        -   最后，调用 `AddCryptedKey` 方法，保存加密私钥，并返回
+
+                if (!AddCryptedKey(pubkey, vchCryptedSecret)) {
+                    return false;
+                }
+                return true;
+
+            `AddCryptedKey` 方法，首先确定是否是加密的，如果没有加密则返回假。接下来，把私钥保存在 `mapCryptedKeys` 集合中，然后调用 `ImplicitlyLearnRelatedKeyScripts` 方法来处理脚本，因为公钥默认是压缩的，所以在方法内会生成脚本，并把脚本保存在 `mapScripts` 集合中。
+
+                bool CCryptoKeyStore::AddCryptedKey(const CPubKey &vchPubKey, const std::vector<unsigned char> &vchCryptedSecret)
+                {
+                    LOCK(cs_KeyStore);
+                    if (!SetCrypted()) {
+                        return false;
+                    }
+                    mapCryptedKeys[vchPubKey.GetID()] = make_pair(vchPubKey, vchCryptedSecret);
+                    ImplicitlyLearnRelatedKeyScripts(vchPubKey);
+                    return true;
+                }
+
+    -   如果变量 `needsDB` 为真，则设置变量 `encrypted_batch` 为空指针。
+
+    -   调用 `GetScriptForDestination` 方法，获得公钥对应的脚本。
+
+            CScript script;
+            script = GetScriptForDestination(pubkey.GetID());
+
+    -   调用 `HaveWatchOnly` 方法，检查 `setWatchOnly` 集合中是否有这个脚本。如果有，则调用 `RemoveWatchOnly` 方法，清除公钥对应的脚本。
+
+            if (HaveWatchOnly(script)) {
+                RemoveWatchOnly(script);
+            }
+
+        `RemoveWatchOnly` 方法执行逻辑如下：
+
+        -   调用 `CCryptoKeyStore::RemoveWatchOnly` 方法来移除脚本。方法内部执行逻辑如下：从 `setWatchOnly` 集合中移除对应的脚本；然后，调用 `ExtractPubKey` 方法，通过脚本来解析出公钥，如果可以得到公钥，则从 `mapWatchKeys` 集合中移除对应的公钥；最后，返回真。
+
+        -   调用数据库访问对象的 `EraseWatchOnly` 方法，从数据库中移除 `watchmeta` 和 `watchs` 对应的数据。
+
+        -   返回真。
+
+    -   调用 `GetScriptForRawPubKey` 方法，从原始公钥获得脚本。
+
+            script = GetScriptForRawPubKey(pubkey);
+
+    -   调用 `HaveWatchOnly` 方法，检查 `setWatchOnly` 集合中是否有这个脚本。如果有，则调用 `RemoveWatchOnly` 方法，清除公钥对应的脚本。
+
+        方法执行逻辑如上所述，这里不讲。
+
+    -   如果不是加密的，则调用数据库的访问对象的 `WriteKey` 方法，把私钥和公钥及密钥元数据写入数据库。
+
+        在这个方法中，首先，以 `keymeta` 为键，保存对应的元数据；然后，把公钥/私钥保存到向量中，以 `key` 为键，保存对应的公钥/私钥。
+
+    -   最后，返回真。
+
+
+### 2.2、TopUpKeyPool
+
+本方法在第一次创建时会执行，在升级钱包到 HD 时，也会执行。它被用来填充密钥池 keypool。下面我们来看下方法的执行。
+
+1.  如果标志禁止私钥，则返回假。
+
+        if (IsWalletFlagSet(WALLET_FLAG_DISABLE_PRIVATE_KEYS)) {
+            return false;
+        }
+
+2.  如果钱包被锁定，则返回假。
+
+        if (IsLocked())
+            return false;
+
+3.  如果参数 `kpSize` 大于0，则设置变量 `nTargetSize` 为 `kpSize`；否则，设置为用户指定的值，或默认的 1000。
+
+        unsigned int nTargetSize;
+        if (kpSize > 0)
+            nTargetSize = kpSize;
+        else
+            nTargetSize = std::max(gArgs.GetArg("-keypool", DEFAULT_KEYPOOL_SIZE), (int64_t) 0);
+
+4.  计算内部、外部可用的密钥数量。
+
+        int64_t missingExternal = std::max(std::max((int64_t) nTargetSize, (int64_t) 1) - (int64_t)setExternalKeyPool.size(), (int64_t) 0);
+        int64_t missingInternal = std::max(std::max((int64_t) nTargetSize, (int64_t) 1) - (int64_t)setInternalKeyPool.size(), (int64_t) 0);
+
+    在用户不指定的情况下，并且是第一次，因为 `setExternalKeyPool`、`setInternalKeyPool` 这两个集合都为空，所以 `missingExternal`、`missingInternal` 两个变量的值都为 1000。
+
+5.  如果不支持 HD 钱包，或者不支持 HD 分割，那么设置变量 `missingInternal` 为0。
+
+        if (!IsHDEnabled() || !CanSupportFeature(FEATURE_HD_SPLIT))
+        {
+            missingInternal = 0;
+        }
+
+6.  生成访问数据库的对象。
+
+        bool internal = false;
+        WalletBatch batch(*database);
+
+7.  进行 `for (int64_t i = missingInternal + missingExternal; i--;)` 循环。
+
+    -   如果 `i` 小于 `missingInternal` ，则设置变量 `internal` 为真。
+
+            if (i < missingInternal) {
+                internal = true;
+            }
+
+    -   设置当前索引。
+
+            int64_t index = ++m_max_keypool_index;
+
+    -   生成公钥对象。
+
+            CPubKey pubkey(GenerateNewKey(batch, internal));
+
+        `GenerateNewKey` 方法用来生成公钥。我们来看下这个方法的执行流程。
+
+        -   生成表示创建的公钥是否为压缩的变量 `fCompressed`。在 0.6 版本之后的公钥默认都是压缩的。
+
+                bool fCompressed = CanSupportFeature(FEATURE_COMPRPUBKEY);
+
+        -   创建私钥对象和密钥元数据对象。这时候私钥和密钥元数据对象都没有经过设置，还不能成为真正的私钥和密钥元数据，只有经过下面两个方法中的某一个处理之后，才变成真正可用的对象。
+
+                CKey secret;
+                int64_t nCreationTime = GetTime();
+                CKeyMetadata metadata(nCreationTime);
+
+        -   如果钱包支持 HD，那么调用 `DeriveNewChildKey` 方法来衍生子私钥，否则，调用 `MakeNewKey` 方法来生成私钥。
+
+                if (IsHDEnabled()) {
+                    DeriveNewChildKey(batch, metadata, secret, (CanSupportFeature(FEATURE_HD_SPLIT) ? internal : false));
+                } else {
+                    secret.MakeNewKey(fCompressed);
+                }
+
+            `IsHDEnabled` 是通过私钥对象的 `hdChain.seed_id` 对象是否为空来判断的，因为在前面生成钱包私钥之后，就设置了这个方法，所以这个方法一定返回真。
+
+            `MakeNewKey` 这个方法，我们在前面创建钱包的私钥时已经看到过，`DeriveNewChildKey` 这个方法我们在下面进行重点讲解，这里暂且略过。
+
+        -   如果变量 `fCompressed` 为真，则调用 `SetMinVersion` 方法，设置最小版本为 `FEATURE_COMPRPUBKEY`，支持压缩公钥的版本。
+
+                if (fCompressed) {
+                    SetMinVersion(FEATURE_COMPRPUBKEY);
+                }
+
+        -   调用私钥的 `GetPubKey` 方法，返回对应的公钥。
+
+            方法内部使用椭圆曲线算法求得公钥。具体不细讲，读者自行看代码。
+
+                CPubKey CKey::GetPubKey() const {
+                    assert(fValid);
+                    secp256k1_pubkey pubkey;
+                    size_t clen = CPubKey::PUBLIC_KEY_SIZE;
+                    CPubKey result;
+                    int ret = secp256k1_ec_pubkey_create(secp256k1_context_sign, &pubkey, begin());
+                    assert(ret);
+                    secp256k1_ec_pubkey_serialize(secp256k1_context_sign, (unsigned char*)result.begin(), &clen, &pubkey, fCompressed ? SECP256K1_EC_COMPRESSED : SECP256K1_EC_UNCOMPRESSED);
+                    assert(result.size() == clen);
+                    assert(result.IsValid());
+                    return result;
+                }
+
+        -   把密钥元数据加入 `mapKeyMetadata` 集合中。
+
+                mapKeyMetadata[pubkey.GetID()] = metadata;
+
+        -   调用 `UpdateTimeFirstKey` 方法，更新 `nTimeFirstKey` 属性。
+
+                UpdateTimeFirstKey(nCreationTime);
+                
+        -   调用 `AddKeyPubKeyWithDB` 方法，把私钥和公钥保存到数据库中。这个方法在前面已经讲过，这里再讲了。
+
+                if (!AddKeyPubKeyWithDB(batch, secret, pubkey)) {
+                    throw std::runtime_error(std::string(__func__) + ": AddKey failed");
+                }
+
+        -   返回公钥。
+
+    -   用公钥生成一个密钥池实体 `CKeyPool` 对象，并调用访问钱包数据库对象的 `WritePool` 方法，以 `pool` 为键把密钥池实体对象写入数据库。
+
+            if (!batch.WritePool(index, CKeyPool(pubkey, internal))) {
+                throw std::runtime_error(std::string(__func__) + ": writing generated key failed");
+            }
+
+    -   如果变量 `internal` 为真，则把索引保存到 `setInternalKeyPool` 集合中，否则，保存到 `setExternalKeyPool` 集合中。
+
+            if (internal) {
+                setInternalKeyPool.insert(index);
+            } else {
+                setExternalKeyPool.insert(index);
+            }
+
+    -   把索引保存到 `m_pool_key_to_index` 集合中。
+
+            m_pool_key_to_index[pubkey.GetID()] = index;
+
+8.  返回真。
+
+
+####    2.2.1、DeriveNewChildKey
+
+这个方法用来衍生子密钥。方法的逻辑如下：
+
+1.  生成相关的变量。
+
+        CKey seed;                     //seed (256bit)
+        CExtKey masterKey;             //hd master key
+        CExtKey accountKey;            //key at m/0'
+        CExtKey chainChildKey;         //key at m/0'/0' (external) or m/0'/1' (internal)
+        CExtKey childKey;              //key at m/0'/0'/<n>'
+
+2.  调用 `GetKey` 方法，根据HD 链对象中保存的公钥对象来得到对应的私钥对象。这个私钥是根私钥，也被称为种子私钥。如果获得不到，则抛出异常。
+
+        if (!GetKey(hdChain.seed_id, seed))
+            throw std::runtime_error(std::string(__func__) + ": seed not found");
+
+    `GetKey` 方法执行流程如下：
+
+    -   如果钱包没有加密，则调用 `CBasicKeyStore::GetKey` 方法，返回公钥对象的私钥。
+
+            if (!IsCrypted()) {
+                return CBasicKeyStore::GetKey(address, keyOut);
+            }
+
+        `CBasicKeyStore::GetKey` 方法直接从 `mapKeys` 集合中取出对应的私钥。
+
+        `mapKeys` 集合是我们前面分析 `DeriveNewSeed` 这个方法的第 6 步 `AddKeyPubKey` 这个方法中把私钥/公钥及元数据保存到数据库过程中设置的。
+
+    -   否则，直接从加密集合 `mapCryptedKeys` 中取得对应的私钥。
+
+            CryptedKeyMap::const_iterator mi = mapCryptedKeys.find(address);
+            if (mi != mapCryptedKeys.end())
+            {
+                const CPubKey &vchPubKey = (*mi).second.first;
+                const std::vector<unsigned char> &vchCryptedSecret = (*mi).second.second;
+                return DecryptKey(vMasterKey, vchCryptedSecret, vchPubKey, keyOut);
+            }
+
+    -   如果以上两种情况都不能返回，那么只能返回假了。
+
+3.  调用主私钥（扩展私钥）的 `SetSeed` 方法，设置种子。此时的主私钥只是一个对象，而不能当作真正的私钥来使用，因为内部数据不存在。只有在本方法调用之后，主私钥才能真正用来衍生密钥。
+
+    我们现在来看下 `SetSeed` 方法的逻辑：
+
+    -   首先，生成需要的变量。
+
+            static const unsigned char hashkey[] = {'B','i','t','c','o','i','n',' ','s','e','e','d'};
+            std::vector<unsigned char, secure_allocator<unsigned char>> vout(64);
+
+    -   其次，调用 `CHMAC_SHA512` 方法，使用 `HMAC_SHA512` 算法，根据种子私钥生成长度为 512 位的字符串。
+
+            CHMAC_SHA512(hashkey, sizeof(hashkey)).Write(seed, nSeedLen).Finalize(vout.data());
+
+    -   然后，调用私钥的 `Set` 方法，用 512 位的字符串的左边 256 位来初始化私钥的 `keydata` 属性，并且设置私钥的有效标志 `fValid` 属性为真，压缩标志 `fCompressed` 为参数指定的值，默认为真。
+
+            key.Set(vout.data(), vout.data() + 32, true);
+
+    -   调用 `memcpy` 方法，把 512 位的字符串的右边 256 位保存为链码。
+
+            memcpy(chaincode.begin(), vout.data() + 32, 32);
+
+    -   设置主私钥的 `nDepth`、`nChild` 为 0。
+
+            nDepth = 0;
+            nChild = 0;
+
+    -   把 `vchFingerprint` 重置为 0。
+
+            memset(vchFingerprint, 0, sizeof(vchFingerprint));
+
+    至此，主私钥终于可用了。
+
+4.  调用主私钥（扩展私钥）的 `Derive` 方法，开始衍生子密钥 `accountKey`。
+
+        masterKey.Derive(accountKey, BIP32_HARDENED_KEY_LIMIT);
+
+    注意，在 bip32 之后，采用硬化衍生子密钥。
+
+    我们来看下 `Derive` 这个方法的执行流程：
+
+    -   设置扩展私钥 `out` 参数的 `nDepth` 为 `nDepth` 加 1。主私钥的 `nDepth` 为 0，参见上面所讲。
+
+    -   获取主公钥的 CKeyID。
+
+             CKeyID id = key.GetPubKey().GetID();
+
+    -   设置置扩展私钥 `out` 参数的 `nChild` 为参数 `_nChild` 的值，这里为 `0x80000000`，10进制为 2147483648。
+
+    -   调用根私钥的 `Derive` 方法，开始衍生私钥。
+
+            return key.Derive(out.key, out.chaincode, _nChild, chaincode);
+
+        这个方法内部执行流程如下：
+
+        -   生成一个向量。
+
+                std::vector<unsigned char, secure_allocator<unsigned char>> vout(64);
+
+        -   把变量 `nChild` 向右移动 31位，如果所得等于 0，那么调用 `GetPubKey` 方法，获得私钥对应的公钥，然后调用 `BIP32Hash` 方法，填充变量 `vout`。在 `BIP32Hash` 方法中使用 `CHMAC_SHA512` 方法，根据链码参数和子密钥数量来填充 `vout` 变量。如果右移所得不等于0，同样调用 `BIP32Hash` 方法，填充变量 `vout`。
+
+                if ((nChild >> 31) == 0) {
+                    CPubKey pubkey = GetPubKey();
+                    assert(pubkey.size() == CPubKey::COMPRESSED_PUBLIC_KEY_SIZE);
+                    BIP32Hash(cc, nChild, *pubkey.begin(), pubkey.begin()+1, vout.data());
+                } else {
+                    assert(size() == 32);
+                    BIP32Hash(cc, nChild, 0, begin(), vout.data());
+                }
+
+        -   把变量 `vout` 的内容拷贝到子链码中。
+
+                memcpy(ccChild.begin(), vout.data()+32, 32);
+
+        -   把私钥的内容拷贝到子私钥中。
+
+                memcpy((unsigned char*)keyChild.begin(), begin(), 32);
+
+        -   使用椭圆曲线算法真正初始化子私钥。
+
+                bool ret = secp256k1_ec_privkey_tweak_add(secp256k1_context_sign, (unsigned char*)keyChild.begin(), vout.data());
+
+        -   设置子私钥为压缩的，是否是有效的，并返回。
+
+                keyChild.fCompressed = true;
+                keyChild.fValid = ret;
+                return ret;
+
+5.  `accountKey` 私钥（扩展私钥）的 `Derive` 方法，开始衍生子密钥 `chainChildKey`。方法前面刚讲过，此处略过。
+
+        accountKey.Derive(chainChildKey, BIP32_HARDENED_KEY_LIMIT+(internal ? 1 : 0));
+
+6.  接下来衍生子私钥 `childKey`，与上面大致相同，可自行阅读。
+
+        do {
+            if (internal) {
+                chainChildKey.Derive(childKey, hdChain.nInternalChainCounter | BIP32_HARDENED_KEY_LIMIT);
+                metadata.hdKeypath = "m/0'/1'/" + std::to_string(hdChain.nInternalChainCounter) + "'";
+                hdChain.nInternalChainCounter++;
+            }
+            else {
+                chainChildKey.Derive(childKey, hdChain.nExternalChainCounter | BIP32_HARDENED_KEY_LIMIT);
+                metadata.hdKeypath = "m/0'/0'/" + std::to_string(hdChain.nExternalChainCounter) + "'";
+                hdChain.nExternalChainCounter++;
+            }
+        } while (HaveKey(childKey.key.GetPubKey().GetID()));  
+
+7.  设置变量 `secret` 的值为子私钥的 `childKey`。
+
+        secret = childKey.key;
+
+8.  设置变量 `metadata` 的 HD 种子为当前 HD 链的的种子。
+
+        metadata.hd_seed_id = hdChain.seed_id;
+
+9.  更新 HD 链到数据库中。
+
+        if (!batch.WriteHDChain(hdChain))
+            throw std::runtime_error(std::string(__func__) + ": Writing HD chain model failed");
+
+
+### 2.3、WalletBatch::LoadWallet
+
+本方法，从数据库中加载钱包的相关数据。方法的执行逻辑如下：
 
 1.  首先，初始化几个变量。
 

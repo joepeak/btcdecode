@@ -114,7 +114,7 @@
             SetLimited(NET_ONION, false); // by default, -proxy sets onion as reachable, unless -noonion later
         }
 
-8.  处理洋葱网络。 如果指定了 `onion` 参数，则处理洋葱网络的相关设置。
+9.  处理洋葱网络。 如果指定了 `onion` 参数，则处理洋葱网络的相关设置。
 
     如果指定了 `-onion`，且不等于空字符串，即指定了洋葱代理地址，进行下面的处理：
 
@@ -147,21 +147,21 @@
             }
         }
 
-9.  处理通过 `-externalip` 参数设置的外部 IP地址。
+10.  处理通过 `-externalip` 参数设置的外部 IP地址。
 
     获取并遍历所有指定的外部地址，进行如下处理：调用 `Lookup` 方法进行DNS 查找。如果成功则调用 `AddLocal` 方法，保存新的地址。否则，抛出初始化错误。
 
-        for (const std::string& strAddr : gArgs.GetArgs("-externalip")) {
-            CService addrLocal;
-            if (Lookup(strAddr.c_str(), addrLocal, GetListenPort(), fNameLookup) && addrLocal.IsValid())
-                AddLocal(addrLocal, LOCAL_MANUAL);
-            else
-                return InitError(ResolveErrMsg("externalip", strAddr));
-        }
+            for (const std::string& strAddr : gArgs.GetArgs("-externalip")) {
+                CService addrLocal;
+                if (Lookup(strAddr.c_str(), addrLocal, GetListenPort(), fNameLookup) && addrLocal.IsValid())
+                    AddLocal(addrLocal, LOCAL_MANUAL);
+                else
+                    return InitError(ResolveErrMsg("externalip", strAddr));
+            }
 
-10.  如果设置了 `maxuploadtarget` 参数，则设置最大出站限制。
+11.  如果设置了 `maxuploadtarget` 参数，则设置最大出站限制。
 
-        if (gArgs.IsArgSet("-maxuploadtarget")) {
-            nMaxOutboundLimit = gArgs.GetArg("-maxuploadtarget", DEFAULT_MAX_UPLOAD_TARGET)*1024*1024;
-        }
+            if (gArgs.IsArgSet("-maxuploadtarget")) {
+                nMaxOutboundLimit = gArgs.GetArg("-maxuploadtarget", DEFAULT_MAX_UPLOAD_TARGET)*1024*1024;
+            }
 
