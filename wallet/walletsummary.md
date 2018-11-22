@@ -1,6 +1,6 @@
 #   引子
 
-创建钱包及其重要的几个都写完了，但总感觉还缺少一些什么，到底缺少什么呢？在重新读过几边之后，才发现原来是不能把一切连贯起来，所以又补写了本篇，作为创建钱包的补充说明。
+创建钱包及其重要的几个都写完了，但总感觉还缺少一些什么，到底缺少什么呢？在重新读过几边之后，才发现通过前面几篇文章还是不能把一切连贯起来，所以又补写了本篇，作为创建钱包的补充说明。
 
 #   正文
 
@@ -84,3 +84,25 @@
 ![创建钱包](http://blockchain.szdyfjh.com/generate-hd-wallet.jpg)
 
 ![创建钱包](http://blockchain.szdyfjh.com/generate-hd-wallet.png)
+
+
+#   后记
+
+由于本人水平所限，文中错误在所难免，欢迎您踊跃指出错误，在下感激不尽。我的微信联系方式：joepeak。
+
+原创不易，尤其寒冬，欢迎赞助我一杯咖啡。
+
+<div style="display: inline-flex;">
+    <div>
+        <img src="http://payee.szdyfjh.com/btcpay.png" alt="drawing" style="width: 200px;" />
+        <p style="text-align: center;">比特币</p>
+    </div>
+    <div>
+        <img src="http://payee.szdyfjh.com/wechatpay.jpg" alt="drawing" style="width: 200px;margin-left: 20px;"/>
+        <p style="text-align: center;">微信</p>
+    </div>
+    <div>
+        <img src="http://payee.szdyfjh.com/alipay.jpg" alt="drawing" style="width: 200px;margin-left: 20px;"/>
+        <p style="text-align: center;">支付宝</p>
+    </div>
+</div>

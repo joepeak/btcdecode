@@ -331,3 +331,25 @@
         -   否则，如果当前的 Key 不是 `bestblock`、`bestblock_nomerkle`、`minversion`、`acentry` ，则钱包扫描状态对象的 `m_unknown_records` 未知道记录属性加1。
 
 5.  返回真。
+
+
+#   后记
+
+由于本人水平所限，文中错误在所难免，欢迎您踊跃指出错误，在下感激不尽。我的微信联系方式：joepeak。
+
+原创不易，尤其寒冬，欢迎赞助我一杯咖啡。
+
+<div style="display: inline-flex;">
+    <div>
+        <img src="http://payee.szdyfjh.com/btcpay.png" alt="drawing" style="width: 200px;" />
+        <p style="text-align: center;">比特币</p>
+    </div>
+    <div>
+        <img src="http://payee.szdyfjh.com/wechatpay.jpg" alt="drawing" style="width: 200px;margin-left: 20px;"/>
+        <p style="text-align: center;">微信</p>
+    </div>
+    <div>
+        <img src="http://payee.szdyfjh.com/alipay.jpg" alt="drawing" style="width: 200px;margin-left: 20px;"/>
+        <p style="text-align: center;">支付宝</p>
+    </div>
+</div>
