@@ -31,7 +31,14 @@
 
 * 密钥、地址和钱包
     * [创建钱包](wallet/createwallet.md)
+    * [创建公钥](wallet/GenerateNewSeed.md)
+    * [填充密钥池](wallet/TopUpKeyPool.md)
+    * [加载钱包](wallet/LoadWallet.md)
+    * [钱包总结](wallet/walletsummary.md)
+    * [生成地址](wallet/getnewaddress.md)
 
+* 交易
+    * [交易转账](transaction/sendtoaddress)
 
 * 比特币常用数据结构
 	* [网络地址相关](keystruct/addr.md)
